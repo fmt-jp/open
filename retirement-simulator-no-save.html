@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老後資金シミュレーター</title>
+<style>
+  :root{
+    --paper:#EFEEE6;
+    --panel:#F8F7F2;
+    --rule:#D9D2C0;
+    --ink:#1F3A5C;
+    --muted:#5C6B73;
+    --faint:#9C9484;
+    --green:#3F6D50;
+    --red:#B8492F;
+    --gold:#A9822F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+    padding:40px 16px;
+  }
+  .serif{font-family:"Yu Mincho","Hiragino Mincho ProN","MS Mincho",serif;}
+  .wrap{max-width:760px;margin:0 auto;}
+  .header{text-align:center;margin-bottom:36px;}
+  .header h1{font-size:30px;font-weight:700;margin:0 0 8px;}
+  .header p{font-size:13px;color:var(--muted);margin:0;}
+  .panel{background:var(--panel);border:1px solid var(--rule);border-radius:2px;padding:24px;margin-bottom:28px;}
+  .panel-title{font-size:14px;margin:0 0 4px;}
+  .panel-sub{font-size:12px;color:var(--muted);margin:0 0 16px;}
+  .row{display:flex;flex-wrap:wrap;gap:24px;}
+  .field{flex:1;min-width:150px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .field .in{display:flex;align-items:baseline;gap:4px;border-bottom:2px solid var(--ink);padding-bottom:2px;}
+  .field .in span.unit{font-size:13px;color:var(--muted);}
+  .field .in span.yen{font-size:13px;color:var(--muted);}
+  input[type=number]{
+    border:none;background:transparent;outline:none;color:var(--ink);
+    font-family:inherit;font-size:19px;font-weight:500;width:100%;
+    -moz-appearance:textfield;
+  }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+  input[type=date]{
+    border:none;background:transparent;outline:none;color:var(--ink);
+    font-family:inherit;font-size:16px;font-weight:500;width:100%;
+  }
+  input[type=text]{
+    border:none;background:transparent;outline:none;color:var(--ink);
+    font-family:inherit;font-size:14px;width:100%;
+  }
+  .ledger{display:flex;gap:0;flex-wrap:wrap;}
+  .col{flex:1;min-width:260px;padding:0 8px;}
+  .col-title{font-size:13px;letter-spacing:.1em;text-transform:uppercase;padding-bottom:8px;margin-bottom:4px;border-bottom:2px solid;font-family:"Yu Mincho","Hiragino Mincho ProN",serif;}
+  .col.income .col-title{color:var(--green);border-color:var(--green);}
+  .col.expense .col-title{color:var(--red);border-color:var(--red);}
+  .divider{width:1px;background:var(--rule);margin:0 16px;align-self:stretch;}
+  .item-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--rule);}
+  .item-row .idx{font-size:11px;color:var(--faint);width:18px;flex-shrink:0;}
+  .item-row .lbl{flex:1;min-width:0;}
+  .item-row .amt-wrap{display:flex;align-items:center;gap:2px;flex-shrink:0;}
+  .item-row .amt-wrap span{font-size:12px;color:var(--faint);}
+  .item-row .amt-wrap input{width:96px;text-align:right;font-size:14px;font-weight:400;}
+  .del-btn{border:none;background:none;cursor:pointer;opacity:.4;padding:2px;flex-shrink:0;font-size:14px;color:var(--muted);}
+  .del-btn:hover{opacity:1;}
+  .add-btn{border:none;background:none;cursor:pointer;font-size:12px;opacity:.65;margin-top:10px;padding:0;}
+  .add-btn:hover{opacity:1;}
+  .col.income .add-btn{color:var(--green);}
+  .col.expense .add-btn{color:var(--red);}
+  .col-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;padding-top:10px;border-top:2px solid;}
+  .col.income .col-total{border-color:var(--green);}
+  .col.expense .col-total{border-color:var(--red);}
+  .col-total .lab{font-size:12px;color:var(--muted);}
+  .col.income .col-total .val{color:var(--green);}
+  .col.expense .col-total .val{color:var(--red);}
+  .col-total .val{font-size:18px;font-weight:500;}
+
+  .pension-box{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-end;}
+  .gap-note{margin-top:14px;padding:10px 12px;background:rgba(169,130,47,0.12);border-left:3px solid var(--gold);font-size:12.5px;color:var(--ink);display:none;}
+
+  .stamps{display:flex;flex-wrap:wrap;gap:20px;}
+  .stamp-card{flex:1;min-width:240px;display:flex;align-items:center;gap:18px;}
+  .hanko{
+    width:80px;height:80px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    transform:rotate(-8deg);
+    font-family:"Yu Mincho","Hiragino Mincho ProN",serif;
+  }
+  .hanko span{writing-mode:vertical-rl;font-size:19px;font-weight:700;letter-spacing:.2em;}
+  .stamp-info .phase{font-size:11px;color:var(--faint);margin-bottom:2px;}
+  .stamp-info .lab{font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .stamp-info .big{font-size:22px;font-weight:700;margin-bottom:2px;}
+  .stamp-info .big .unit{font-size:12px;font-weight:400;}
+
+  .chart-wrap{width:100%;overflow:hidden;}
+  .summary{background:var(--ink);border-radius:2px;padding:28px;}
+  .summary-title{font-size:14px;opacity:.8;color:var(--paper);margin:0 0 16px;font-family:"Yu Mincho","Hiragino Mincho ProN",serif;}
+  .summary-grid{display:flex;flex-wrap:wrap;gap:20px;}
+  .summary-item{flex:1;min-width:220px;}
+  .summary-item .lab{font-size:12px;opacity:.6;color:var(--paper);margin-bottom:4px;}
+  .summary-item .val{font-size:20px;font-weight:700;}
+  .summary-note{margin-top:16px;padding-top:16px;border-top:1px solid rgba(239,238,230,.2);font-size:13px;opacity:.8;color:var(--paper);}
+  @media (max-width:600px){
+    .ledger{flex-direction:column;}
+    .divider{display:none;}
+    .col{padding:0;margin-bottom:20px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <h1 class="serif">老後資金シミュレーター</h1>
+    <p>退職年齢と年金支給開始年齢を別々に入力し、毎月の過不足と資金の寿命を確かめます</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title serif">基本情報</div>
+    <div class="row">
+      <div class="field">
+        <label>退職年齢</label>
+        <div class="in"><input type="number" id="retireAge" value="60"><span class="unit">歳</span></div>
+      </div>
+      <div class="field">
+        <label>想定寿命年齢</label>
+        <div class="in"><input type="number" id="lifeExpectancy" value="90"><span class="unit">歳</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title serif">年金</div>
+    <div class="panel-sub">退職年齢と支給開始年齢が異なる場合、その間は年金収入なしとして計算します</div>
+    <div class="pension-box">
+      <div class="field">
+        <label>年金（月額）</label>
+        <div class="in"><span class="yen">¥</span><input type="number" id="pensionAmount" value="220000"></div>
+      </div>
+      <div class="field">
+        <label>年金支給開始年齢</label>
+        <div class="in"><input type="number" id="pensionStartAge" value="65"><span class="unit">歳</span></div>
+      </div>
+    </div>
+    <div class="gap-note" id="gapNote"></div>
+  </div>
+
+  <div class="panel">
+    <div class="ledger">
+      <div class="col income">
+        <div class="col-title">その他の収入（月額）</div>
+        <div id="incomeList"></div>
+        <button class="add-btn" onclick="addItem('income')">＋ 項目を追加</button>
+        <div class="col-total"><span class="lab">合計 / 月（年金を除く）</span><span class="val" id="incomeTotal">¥0</span></div>
+      </div>
+      <div class="divider"></div>
+      <div class="col expense">
+        <div class="col-title">支出（月額）</div>
+        <div id="expenseList"></div>
+        <button class="add-btn" onclick="addItem('expense')">＋ 項目を追加</button>
+        <div class="col-total"><span class="lab">合計 / 月</span><span class="val" id="expenseTotal">¥0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title serif">資産（退職時点）</div>
+    <div class="row">
+      <div class="field">
+        <label>預貯金など</label>
+        <div class="in"><span class="yen">¥</span><input type="number" id="savings" value="8000000"></div>
+      </div>
+      <div class="field">
+        <label>退職金</label>
+        <div class="in"><span class="yen">¥</span><input type="number" id="lumpSum" value="12000000"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="stamps" id="stampsWrap"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title serif" id="chartTitle">資産残高の推移</div>
+    <div class="chart-wrap">
+      <svg id="chart" width="100%" height="260" viewBox="0 0 700 260" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-title">まとめ</div>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="lab">資金が尽きる年齢</div>
+        <div class="val" id="depletionLabel">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="lab">生涯の不足額（想定寿命まで）</div>
+        <div class="val" id="shortfallLabel">—</div>
+      </div>
+    </div>
+    <div class="summary-note" id="summaryNote" style="display:none;"></div>
+  </div>
+
+</div>
+
+<script>
+let uid = 1;
+const nextId = () => uid++;
+
+let state = {
+  income: [
+    { id: nextId(), label: "就労収入など", amount: 0 }
+  ],
+  expense: [
+    { id: nextId(), label: "住居費", amount: 60000 },
+    { id: nextId(), label: "食費", amount: 65000 },
+    { id: nextId(), label: "水道光熱費", amount: 22000 },
+    { id: nextId(), label: "保険料", amount: 15000 },
+    { id: nextId(), label: "通信費", amount: 10000 },
+    { id: nextId(), label: "その他生活費", amount: 40000 }
+  ]
+};
+
+function yen(n){
+  const r = Math.round(n);
+  return "¥" + r.toLocaleString("ja-JP");
+}
+function yenSigned(n){
+  const r = Math.round(n);
+  return (r < 0 ? "-" : "+") + "¥" + Math.abs(r).toLocaleString("ja-JP");
+}
+
+function addItem(kind){
+  state[kind].push({ id: nextId(), label: "", amount: 0 });
+  renderLedger();
+  update();
+}
+function removeItem(kind, id){
+  state[kind] = state[kind].filter(i => i.id !== id);
+  renderLedger();
+  update();
+}
+function updateItem(kind, id, field, value){
+  const item = state[kind].find(i => i.id === id);
+  if(item) item[field] = value;
+  update();
+}
+
+function renderList(kind){
+  const container = document.getElementById(kind + "List");
+  container.innerHTML = "";
+  state[kind].forEach((item, idx) => {
+    const row = document.createElement("div");
+    row.className = "item-row";
+    row.innerHTML = `
+      <span class="idx">${String(idx+1).padStart(2,"0")}</span>
+      <span class="lbl"><input type="text" placeholder="項目名" value="${item.label.replace(/"/g,'&quot;')}"></span>
+      <span class="amt-wrap"><span>¥</span><input type="number" value="${item.amount}"></span>
+      <button class="del-btn" title="削除">✕</button>
+    `;
+    const [labelInput, amountInput] = row.querySelectorAll("input");
+    const delBtn = row.querySelector(".del-btn");
+    labelInput.addEventListener("input", e => updateItem(kind, item.id, "label", e.target.value));
+    amountInput.addEventListener("input", e => updateItem(kind, item.id, "amount", Number(e.target.value) || 0));
+    delBtn.addEventListener("click", () => removeItem(kind, item.id));
+    container.appendChild(row);
+  });
+}
+
+function renderLedger(){
+  renderList("income");
+  renderList("expense");
+}
+
+// ---- age helpers ----
+function fmtAge(age){
+  return (Math.round(age * 10) / 10).toLocaleString("ja-JP", {minimumFractionDigits:1, maximumFractionDigits:1}) + "歳";
+}
+
+function makeHanko(container, phaseLabel, monthlyDiff){
+  const surplus = monthlyDiff >= 0;
+  const color = surplus ? "#3F6D50" : "#B8492F";
+  const card = document.createElement("div");
+  card.className = "stamp-card";
+  card.innerHTML = `
+    <div class="hanko" style="border:3px double ${color};color:${color};"><span>${surplus ? "黒字" : "赤字"}</span></div>
+    <div class="stamp-info">
+      <div class="phase">${phaseLabel}</div>
+      <div class="lab">月次収支</div>
+      <div class="big" style="color:${color};">${yenSigned(monthlyDiff)}<span class="unit"> /月</span></div>
+    </div>
+  `;
+  container.appendChild(card);
+}
+
+function drawChart(chartData, overallSurplus, depletionAge){
+  const svg = document.getElementById("chart");
+  const W = 700, H = 260, padL = 55, padR = 15, padT = 15, padB = 25;
+  svg.innerHTML = "";
+  if(chartData.length < 2) return;
+
+  const ages = chartData.map(d => d.age);
+  const balances = chartData.map(d => d.balance);
+  const minAge = Math.min(...ages), maxAge = Math.max(...ages);
+  const minBal = Math.min(0, ...balances);
+  const maxBal = Math.max(0, ...balances) * 1.05 || 1;
+
+  const x = age => padL + ( (age - minAge) / Math.max(0.001, (maxAge - minAge)) ) * (W - padL - padR);
+  const y = bal => padT + (1 - (bal - minBal) / Math.max(1, (maxBal - minBal))) * (H - padT - padB);
+
+  const ns = "http://www.w3.org/2000/svg";
+  const color = overallSurplus ? "#3F6D50" : "#B8492F";
+
+  const gridCount = 4;
+  for(let i=0;i<=gridCount;i++){
+    const gy = padT + (i/gridCount) * (H - padT - padB);
+    const line = document.createElementNS(ns, "line");
+    line.setAttribute("x1", padL); line.setAttribute("x2", W-padR);
+    line.setAttribute("y1", gy); line.setAttribute("y2", gy);
+    line.setAttribute("stroke", "#D9D2C0"); line.setAttribute("stroke-dasharray","2 4");
+    svg.appendChild(line);
+    const val = maxBal - (i/gridCount)*(maxBal-minBal);
+    const label = document.createElementNS(ns,"text");
+    label.setAttribute("x", padL - 8); label.setAttribute("y", gy+4);
+    label.setAttribute("text-anchor","end"); label.setAttribute("font-size","11");
+    label.setAttribute("fill","#5C6B73");
+    label.textContent = Math.round(val/10000) + "万";
+    svg.appendChild(label);
+  }
+
+  const xTickCount = Math.min(6, ages.length);
+  for(let i=0;i<xTickCount;i++){
+    const idx = Math.round(i * (ages.length-1) / Math.max(1,xTickCount-1));
+    const age = ages[idx];
+    const label = document.createElementNS(ns,"text");
+    label.setAttribute("x", x(age)); label.setAttribute("y", H-6);
+    label.setAttribute("text-anchor","middle"); label.setAttribute("font-size","11");
+    label.setAttribute("fill","#5C6B73");
+    label.textContent = Math.round(age) + "歳";
+    svg.appendChild(label);
+  }
+
+  const zeroY = y(0);
+  const zline = document.createElementNS(ns,"line");
+  zline.setAttribute("x1", padL); zline.setAttribute("x2", W-padR);
+  zline.setAttribute("y1", zeroY); zline.setAttribute("y2", zeroY);
+  zline.setAttribute("stroke","#1F3A5C"); zline.setAttribute("stroke-width","1");
+  svg.appendChild(zline);
+
+  let areaPath = `M ${x(ages[0])} ${y(balances[0])}`;
+  for(let i=1;i<chartData.length;i++) areaPath += ` L ${x(ages[i])} ${y(balances[i])}`;
+  areaPath += ` L ${x(ages[ages.length-1])} ${zeroY} L ${x(ages[0])} ${zeroY} Z`;
+
+  const gradId = "grad" + Math.round(Math.random()*100000);
+  const defs = document.createElementNS(ns,"defs");
+  const grad = document.createElementNS(ns,"linearGradient");
+  grad.setAttribute("id", gradId);
+  grad.setAttribute("x1","0"); grad.setAttribute("y1","0");
+  grad.setAttribute("x2","0"); grad.setAttribute("y2","1");
+  const stop1 = document.createElementNS(ns,"stop");
+  stop1.setAttribute("offset","0%"); stop1.setAttribute("stop-color", color); stop1.setAttribute("stop-opacity","0.35");
+  const stop2 = document.createElementNS(ns,"stop");
+  stop2.setAttribute("offset","100%"); stop2.setAttribute("stop-color", color); stop2.setAttribute("stop-opacity","0.03");
+  grad.appendChild(stop1); grad.appendChild(stop2);
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+
+  const area = document.createElementNS(ns,"path");
+  area.setAttribute("d", areaPath);
+  area.setAttribute("fill", `url(#${gradId})`);
+  area.setAttribute("stroke","none");
+  svg.appendChild(area);
+
+  let linePath = `M ${x(ages[0])} ${y(balances[0])}`;
+  for(let i=1;i<chartData.length;i++) linePath += ` L ${x(ages[i])} ${y(balances[i])}`;
+  const line = document.createElementNS(ns,"path");
+  line.setAttribute("d", linePath);
+  line.setAttribute("fill","none");
+  line.setAttribute("stroke", color);
+  line.setAttribute("stroke-width","2");
+  svg.appendChild(line);
+
+  if(depletionAge !== null){
+    const dot = document.createElementNS(ns,"circle");
+    dot.setAttribute("cx", x(depletionAge));
+    dot.setAttribute("cy", zeroY);
+    dot.setAttribute("r","5");
+    dot.setAttribute("fill","#B8492F");
+    dot.setAttribute("stroke","#F8F7F2");
+    dot.setAttribute("stroke-width","2");
+    svg.appendChild(dot);
+  }
+}
+
+function update(){
+  const retireAge = Number(document.getElementById("retireAge").value) || 0;
+  const pensionStartAge = Number(document.getElementById("pensionStartAge").value) || 0;
+  const lifeExpectancy = Number(document.getElementById("lifeExpectancy").value) || 0;
+  const pensionAmount = Number(document.getElementById("pensionAmount").value) || 0;
+  const savings = Number(document.getElementById("savings").value) || 0;
+  const lumpSum = Number(document.getElementById("lumpSum").value) || 0;
+
+  const incomeTotal = state.income.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const expenseTotal = state.expense.reduce((s,i)=>s+(Number(i.amount)||0),0);
+
+  document.getElementById("incomeTotal").textContent = yen(incomeTotal);
+  document.getElementById("expenseTotal").textContent = yen(expenseTotal);
+
+  const stampsWrap = document.getElementById("stampsWrap");
+  stampsWrap.innerHTML = "";
+  const gapNote = document.getElementById("gapNote");
+
+  const diffBefore = incomeTotal - expenseTotal; // before pension starts
+  const diffAfter = incomeTotal + pensionAmount - expenseTotal; // after pension starts
+
+  const gapYears = pensionStartAge - retireAge;
+  const gapMonths = Math.round(gapYears * 12);
+
+  if(gapMonths > 0){
+    gapNote.style.display = "block";
+    const y = Math.floor(gapMonths/12), m = gapMonths % 12;
+    const gapStr = (y>0? y+"年":"") + (m>0? m+"ヶ月":"") || "1ヶ月未満";
+    gapNote.textContent = `退職年齢から年金支給開始年齢まで ${gapStr} の「空白期間」があります。この間は年金収入なしで生活費をまかなう必要があります。`;
+    makeHanko(stampsWrap, `年金開始前（〜${pensionStartAge}歳）`, diffBefore);
+    makeHanko(stampsWrap, `年金開始後（${pensionStartAge}歳〜）`, diffAfter);
+  } else {
+    gapNote.style.display = "none";
+    makeHanko(stampsWrap, "年金受給中", diffAfter);
+  }
+
+  const initialAssets = savings + lumpSum;
+  let totalMonths = Math.round((lifeExpectancy - retireAge) * 12);
+  if(totalMonths < 0) totalMonths = 0;
+
+  const chartData = [];
+  let balance = initialAssets;
+  let depletionAge = null;
+  chartData.push({ age: retireAge, balance: Math.round(balance) });
+
+  for(let m=1; m<=totalMonths; m++){
+    const age = retireAge + m/12;
+    const pensionActive = age >= pensionStartAge;
+    const monthlyIncome = incomeTotal + (pensionActive ? pensionAmount : 0);
+    balance += (monthlyIncome - expenseTotal);
+    chartData.push({ age, balance: Math.round(balance) });
+    if(depletionAge === null && balance < 0) depletionAge = age;
+  }
+
+  const finalBalance = chartData.length ? chartData[chartData.length-1].balance : initialAssets;
+  const lifetimeShortfall = finalBalance < 0 ? -finalBalance : 0;
+
+  document.getElementById("chartTitle").textContent =
+    `資産残高の推移（${retireAge}歳〜${lifeExpectancy}歳）`;
+  drawChart(chartData, finalBalance >= 0, depletionAge);
+
+  const depletionLabel = document.getElementById("depletionLabel");
+  if(depletionAge !== null){
+    depletionLabel.textContent = `${fmtAge(depletionAge)}（寿命の${Math.round((lifeExpectancy - depletionAge)*10)/10}年前）`;
+    depletionLabel.style.color = "#E8A08C";
+  } else {
+    depletionLabel.textContent = "尽きません";
+    depletionLabel.style.color = "#8FC29E";
+  }
+
+  const shortfallLabel = document.getElementById("shortfallLabel");
+  if(lifetimeShortfall > 0){
+    shortfallLabel.textContent = yen(lifetimeShortfall);
+    shortfallLabel.style.color = "#E8A08C";
+  } else {
+    shortfallLabel.textContent = "不足なし";
+    shortfallLabel.style.color = "#8FC29E";
+  }
+
+  const note = document.getElementById("summaryNote");
+  if(lifetimeShortfall > 0){
+    note.style.display = "block";
+    const worstMonthly = Math.min(diffBefore, diffAfter);
+    note.textContent = `毎月あと ${yen(-worstMonthly)} の収入増加、または支出削減があれば収支は均衡します（最も厳しい期間で計算）。`;
+  } else {
+    note.style.display = "none";
+  }
+}
+
+["retireAge","pensionStartAge","lifeExpectancy","pensionAmount","savings","lumpSum"].forEach(id => {
+  document.getElementById(id).addEventListener("input", update);
+});
+
+renderLedger();
+update();
+</script>
+</body>
+</html>
