@@ -133,7 +133,7 @@
   .readout{
     margin-top: 14px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     gap: 1px;
     background: var(--line);
     border: 1px solid var(--line);
@@ -313,8 +313,12 @@
 
     <div class="readout">
       <div class="stat">
-        <div class="k">Camera</div>
-        <div class="v" id="rCamera">—</div>
+        <div class="k">Make</div>
+        <div class="v" id="rMake">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">Model</div>
+        <div class="v" id="rModel">—</div>
       </div>
       <div class="stat">
         <div class="k">Aperture</div>
@@ -364,7 +368,8 @@
 
     <div class="controls">
       <div class="toggles" id="toggles">
-        <label class="toggle on"><input type="checkbox" data-field="camera" checked>カメラ機種</label>
+        <label class="toggle"><input type="checkbox" data-field="make">製造元</label>
+        <label class="toggle on"><input type="checkbox" data-field="model" checked>モデル</label>
         <label class="toggle on"><input type="checkbox" data-field="aperture" checked>絞り</label>
         <label class="toggle on"><input type="checkbox" data-field="focal" checked>画角(焦点距離)</label>
         <label class="toggle on"><input type="checkbox" data-field="iso" checked>ISO</label>
@@ -397,7 +402,7 @@ const posSelect = document.getElementById('posSelect');
 
 let currentImage = null;
 let currentExif = null;
-let currentFields = { camera:true, aperture:true, focal:true, iso:true };
+let currentFields = { make:false, model:true, aperture:true, focal:true, iso:true };
 let currentTextColor = '#ffffff';
 let currentTextScale = 1;
 let currentTextPosition = 'left';
@@ -507,15 +512,12 @@ async function handleFile(file){
 }
 
 function buildStrings(exif){
-  const out = { camera:null, aperture:null, focal:null, iso:null };
+  const out = { make:null, model:null, aperture:null, focal:null, iso:null };
 
   const make = (exif.Make||'').trim();
   const model = (exif.Model||'').trim();
-  if(model){
-    out.camera = (make && !model.toLowerCase().includes(make.toLowerCase())) ? (make+' '+model) : model;
-  } else if(make){
-    out.camera = make;
-  }
+  if(make) out.make = make;
+  if(model) out.model = model;
 
   const fnum = exif.FNumber || exif.ApertureValue;
   if(fnum){
@@ -539,8 +541,10 @@ function buildStrings(exif){
 
 function updateReadout(exif){
   const s = buildStrings(exif);
-  document.getElementById('rCamera').textContent = s.camera || '検出なし';
-  document.getElementById('rCamera').classList.toggle('empty', !s.camera);
+  document.getElementById('rMake').textContent = s.make || '検出なし';
+  document.getElementById('rMake').classList.toggle('empty', !s.make);
+  document.getElementById('rModel').textContent = s.model || '検出なし';
+  document.getElementById('rModel').classList.toggle('empty', !s.model);
   document.getElementById('rAperture').textContent = s.aperture || '検出なし';
   document.getElementById('rAperture').classList.toggle('empty', !s.aperture);
   document.getElementById('rFocal').textContent = s.focal || '検出なし';
@@ -568,7 +572,14 @@ function render(){
 
   const s = buildStrings(currentExif || {});
   const lines = [];
-  if(currentFields.camera && s.camera) lines.push(s.camera);
+
+  const camParts = [];
+  if(currentFields.make && s.make) camParts.push(s.make);
+  if(currentFields.model && s.model){
+    const dup = currentFields.make && s.make && s.model.toLowerCase().includes(s.make.toLowerCase());
+    if(!dup) camParts.push(s.model);
+  }
+  if(camParts.length) lines.push(camParts.join(' '));
 
   const specParts = [];
   if(currentFields.aperture && s.aperture) specParts.push(s.aperture);
