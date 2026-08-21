@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#121212">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EXIF Overlay">
+<title>EXIF Overlay — 撮影データ焼き込みツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
+<style>
+  :root{
+    --bg: #121212;
+    --panel: #1b1b1a;
+    --panel-2: #202020;
+    --line: #333331;
+    --amber: #f2a93b;
+    --amber-dim: #a97a34;
+    --text: #ecece7;
+    --text-dim: #8f8f89;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; min-height:100vh;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1a1a19 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: var(--sans);
+  }
+  .wrap{
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom: 36px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px;
+  }
+  header .mark{
+    display:flex; align-items:center; gap:10px;
+  }
+  header .dot{
+    width:9px; height:9px; border-radius:50%;
+    background: var(--amber);
+    box-shadow: 0 0 10px 2px rgba(242,169,59,0.55);
+  }
+  h1{
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin:0;
+  }
+  header .sub{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  .dropzone{
+    position: relative;
+    border: 1px dashed var(--line);
+    border-radius: 2px;
+    background: var(--panel);
+    padding: 56px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .dropzone.drag{
+    border-color: var(--amber);
+    background: #201c14;
+  }
+  .dropzone input{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .dz-icon{
+    width: 46px; height: 46px;
+    margin: 0 auto 18px;
+    position: relative;
+  }
+  .dz-icon svg{ width:100%; height:100%; display:block; }
+  .dz-title{
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .dz-hint{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+  }
+
+  .stage{
+    margin-top: 28px;
+    display: none;
+  }
+  .stage.active{ display:block; }
+
+  .frame{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 14px;
+    border-radius: 2px;
+  }
+  .canvas-holder{
+    width: 100%;
+    overflow: hidden;
+    background: #0c0c0b;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  canvas{
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .readout{
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .stat{
+    background: var(--panel-2);
+    padding: 12px 14px;
+  }
+  .stat .k{
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--amber-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .stat .v{
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--text);
+    letter-spacing: 0.01em;
+  }
+  .stat .v.empty{ color: var(--text-dim); }
+
+  .style-controls{
+    margin-top: 18px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    padding: 14px 16px;
+  }
+  .ctrl{
+    display:flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .ctrl-label{
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--amber-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .color-row{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+  }
+  #colorInput{
+    width: 34px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .swatches{ display:flex; gap:6px; }
+  .swatch{
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    cursor: pointer;
+    padding: 0;
+  }
+  .swatch:hover{ border-color: var(--amber); }
+  #sizeSelect, #posSelect{
+    font-family: var(--sans);
+    font-size: 12.5px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  .controls{
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .toggles{
+    display:flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .toggle{
+    display:flex; align-items:center; gap:7px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    cursor:pointer;
+    user-select:none;
+  }
+  .toggle input{ accent-color: var(--amber); }
+  .toggle.on{ color: var(--text); }
+
+  .buttons{ display:flex; gap:10px; }
+  button.primary, button.ghost, label.file-btn{
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 18px;
+    border-radius: 2px;
+    border: 1px solid var(--amber);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+  button.primary{
+    background: var(--amber);
+    color: #1a1400;
+  }
+  button.primary:hover{ background: #ffbb54; }
+  button.ghost, label.file-btn{
+    background: transparent;
+    color: var(--amber);
+    border-color: var(--line);
+  }
+  button.ghost:hover, label.file-btn:hover{ border-color: var(--amber); }
+
+  .note{
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  footer{
+    margin-top: 40px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #55554f;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mark">
+      <span class="dot"></span>
+      <h1>EXIF OVERLAY</h1>
+    </div>
+    <div class="sub">CAMERA · APERTURE · FOCAL LENGTH · ISO</div>
+  </header>
+
+  <label class="dropzone" id="dropzone" for="fileInput">
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/tiff,image/webp">
+    <div class="dz-icon">
+      <svg viewBox="0 0 48 48" fill="none">
+        <rect x="4" y="12" width="40" height="28" rx="2" stroke="#8f8f89" stroke-width="1.4"/>
+        <path d="M16 12l3-5h10l3 5" stroke="#8f8f89" stroke-width="1.4" stroke-linejoin="round"/>
+        <circle cx="24" cy="27" r="8" stroke="#f2a93b" stroke-width="1.4"/>
+        <circle cx="24" cy="27" r="3" fill="#f2a93b"/>
+        <circle cx="38" cy="17" r="1.4" fill="#8f8f89"/>
+      </svg>
+    </div>
+    <div class="dz-title">写真をタップして選択、またはドラッグ&ドロップ</div>
+    <div class="dz-hint">JPEG / PNG / TIFF — EXIF情報を自動抽出します</div>
+  </label>
+
+  <div class="stage" id="stage">
+    <div class="frame">
+      <div class="canvas-holder">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="readout">
+      <div class="stat">
+        <div class="k">Make</div>
+        <div class="v" id="rMake">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">Model</div>
+        <div class="v" id="rModel">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">Aperture</div>
+        <div class="v" id="rAperture">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">Focal Length</div>
+        <div class="v" id="rFocal">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">ISO</div>
+        <div class="v" id="rIso">—</div>
+      </div>
+    </div>
+
+    <div class="style-controls" id="styleControls">
+      <div class="ctrl">
+        <label class="ctrl-label" for="colorInput">文字色</label>
+        <div class="color-row">
+          <input type="color" id="colorInput" value="#ffffff">
+          <div class="swatches" id="swatches">
+            <button type="button" class="swatch" data-color="#ffffff" style="background:#ffffff" title="白"></button>
+            <button type="button" class="swatch" data-color="#f2a93b" style="background:#f2a93b" title="アンバー"></button>
+            <button type="button" class="swatch" data-color="#000000" style="background:#000000" title="黒"></button>
+            <button type="button" class="swatch" data-color="#ff3b30" style="background:#ff3b30" title="赤"></button>
+          </div>
+        </div>
+      </div>
+      <div class="ctrl">
+        <label class="ctrl-label" for="sizeSelect">文字サイズ</label>
+        <select id="sizeSelect">
+          <option value="0.75">小</option>
+          <option value="1" selected>中</option>
+          <option value="1.35">大</option>
+          <option value="1.7">特大</option>
+        </select>
+      </div>
+      <div class="ctrl">
+        <label class="ctrl-label" for="posSelect">文字位置</label>
+        <select id="posSelect">
+          <option value="left" selected>左下</option>
+          <option value="center">中央下</option>
+          <option value="right">右下</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="toggles" id="toggles">
+        <label class="toggle"><input type="checkbox" data-field="make">製造元</label>
+        <label class="toggle on"><input type="checkbox" data-field="model" checked>モデル</label>
+        <label class="toggle on"><input type="checkbox" data-field="aperture" checked>絞り</label>
+        <label class="toggle on"><input type="checkbox" data-field="focal" checked>画角(焦点距離)</label>
+        <label class="toggle on"><input type="checkbox" data-field="iso" checked>ISO</label>
+      </div>
+      <div class="buttons">
+        <label class="file-btn" id="reloadBtn" for="fileInput">別の写真を選ぶ</label>
+        <button class="primary" id="downloadBtn">画像を保存</button>
+      </div>
+    </div>
+
+    <div class="note">※「画角」は撮影時の焦点距離(mm)として表示しています。センサーサイズにより実際の画角(°)は異なります。<br>※ EXIF情報が写真に含まれていない項目は表示されません。</div>
+  </div>
+
+  <footer>ALL PROCESSING HAPPENS LOCALLY IN YOUR BROWSER — NO UPLOAD</footer>
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const reloadBtn = document.getElementById('reloadBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const togglesEl = document.getElementById('toggles');
+const colorInput = document.getElementById('colorInput');
+const swatches = document.getElementById('swatches');
+const sizeSelect = document.getElementById('sizeSelect');
+const posSelect = document.getElementById('posSelect');
+
+let currentImage = null;
+let currentExif = null;
+let currentFields = { make:false, model:true, aperture:true, focal:true, iso:true };
+let currentTextColor = '#ffffff';
+let currentTextScale = 1;
+let currentTextPosition = 'left';
+let currentFileType = 'image/jpeg';
+
+['dragover','dragenter'].forEach(evt=>{
+  dropzone.addEventListener(evt, e=>{
+    e.preventDefault();
+    dropzone.classList.add('drag');
+  });
+});
+['dragleave','drop'].forEach(evt=>{
+  dropzone.addEventListener(evt, e=>{
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+  });
+});
+dropzone.addEventListener('drop', e=>{
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files && e.target.files[0];
+  if(f) handleFile(f);
+});
+
+togglesEl.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+  cb.addEventListener('change', e=>{
+    const field = e.target.dataset.field;
+    currentFields[field] = e.target.checked;
+    e.target.closest('.toggle').classList.toggle('on', e.target.checked);
+    render();
+  });
+});
+
+colorInput.addEventListener('input', e=>{
+  currentTextColor = e.target.value;
+  render();
+});
+swatches.querySelectorAll('.swatch').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    currentTextColor = btn.dataset.color;
+    colorInput.value = btn.dataset.color;
+    render();
+  });
+});
+sizeSelect.addEventListener('change', e=>{
+  currentTextScale = parseFloat(e.target.value);
+  render();
+});
+posSelect.addEventListener('change', e=>{
+  currentTextPosition = e.target.value;
+  render();
+});
+
+function readExif(file){
+  return new Promise((resolve)=>{
+    let done = false;
+    const finish = (tags) => {
+      if(done) return;
+      done = true;
+      resolve(tags || {});
+    };
+    if(!window.EXIF){ finish({}); return; }
+    try{
+      EXIF.getData(file, function(){
+        const tags = EXIF.getAllTags(this) || {};
+        finish(tags);
+      });
+    }catch(err){
+      console.warn('EXIF parse failed', err);
+      finish({});
+    }
+    // Safety net: some formats (e.g. HEIC) can leave the callback unfired.
+    setTimeout(() => finish({}), 2500);
+  });
+}
+
+const MAX_DIMENSION = 3500; // keep well under iOS/iPadOS canvas limits
+
+async function handleFile(file){
+  try{
+    currentFileType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+
+    const exif = await readExif(file);
+    currentExif = exif;
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    await new Promise((resolve, reject)=>{
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('image-decode-failed'));
+      img.src = url;
+    });
+
+    currentImage = img;
+    stage.classList.add('active');
+    updateReadout(exif);
+    render();
+    URL.revokeObjectURL(url);
+    stage.scrollIntoView({behavior:'smooth', block:'start'});
+  }catch(err){
+    console.error(err);
+    alert('写真を読み込めませんでした。別の写真、または別の形式(JPEG/PNG)でお試しください。\n\nエラー: ' + (err && err.message ? err.message : err));
+  }
+}
+
+function buildStrings(exif){
+  const out = { make:null, model:null, aperture:null, focal:null, iso:null };
+
+  const make = (exif.Make||'').trim();
+  const model = (exif.Model||'').trim();
+  if(make) out.make = make;
+  if(model) out.model = model;
+
+  const fnum = exif.FNumber || exif.ApertureValue;
+  if(fnum){
+    const v = Math.round(fnum*10)/10;
+    out.aperture = 'f/' + (Number.isInteger(v) ? v.toFixed(1) : v);
+  }
+
+  const focal = exif.FocalLength;
+  if(focal){
+    const v = Math.round(focal*10)/10;
+    out.focal = (Number.isInteger(v) ? Math.round(v) : v) + 'mm';
+  }
+
+  const iso = exif.ISO || exif.ISOSpeedRatings || exif.PhotographicSensitivity;
+  if(iso){
+    out.iso = 'ISO ' + iso;
+  }
+
+  return out;
+}
+
+function updateReadout(exif){
+  const s = buildStrings(exif);
+  document.getElementById('rMake').textContent = s.make || '検出なし';
+  document.getElementById('rMake').classList.toggle('empty', !s.make);
+  document.getElementById('rModel').textContent = s.model || '検出なし';
+  document.getElementById('rModel').classList.toggle('empty', !s.model);
+  document.getElementById('rAperture').textContent = s.aperture || '検出なし';
+  document.getElementById('rAperture').classList.toggle('empty', !s.aperture);
+  document.getElementById('rFocal').textContent = s.focal || '検出なし';
+  document.getElementById('rFocal').classList.toggle('empty', !s.focal);
+  document.getElementById('rIso').textContent = s.iso || '検出なし';
+  document.getElementById('rIso').classList.toggle('empty', !s.iso);
+}
+
+function render(){
+  if(!currentImage) return;
+  const img = currentImage;
+  let w = img.naturalWidth;
+  let h = img.naturalHeight;
+
+  if(Math.max(w, h) > MAX_DIMENSION){
+    const scaleDown = MAX_DIMENSION / Math.max(w, h);
+    w = Math.round(w * scaleDown);
+    h = Math.round(h * scaleDown);
+  }
+
+  canvas.width = w;
+  canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const s = buildStrings(currentExif || {});
+  const lines = [];
+
+  const camParts = [];
+  if(currentFields.make && s.make) camParts.push(s.make);
+  if(currentFields.model && s.model){
+    const dup = currentFields.make && s.make && s.model.toLowerCase().includes(s.make.toLowerCase());
+    if(!dup) camParts.push(s.model);
+  }
+  if(camParts.length) lines.push(camParts.join(' '));
+
+  const specParts = [];
+  if(currentFields.aperture && s.aperture) specParts.push(s.aperture);
+  if(currentFields.focal && s.focal) specParts.push(s.focal);
+  if(currentFields.iso && s.iso) specParts.push(s.iso);
+  if(specParts.length) lines.push(specParts.join('   '));
+
+  if(lines.length === 0) return;
+
+  drawOverlay(ctx, w, h, lines);
+}
+
+function drawOverlay(ctx, w, h, lines){
+  const scale = (Math.max(w, h) / 1600) * currentTextScale;
+  const pad = Math.round(30 * (Math.max(w, h) / 1600));
+  const titleSize = Math.max(11, Math.round(22 * scale));
+  const specSize = Math.max(10, Math.round(17 * scale));
+  const gap = Math.round(8 * scale);
+
+  ctx.textBaseline = 'alphabetic';
+
+  const titleFont = `600 ${titleSize}px ui-sans-serif, -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
+  const specFont = `500 ${specSize}px ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace`;
+
+  let blockLines = [];
+  if(lines[0]){
+    blockLines.push({text: lines[0], font: titleFont, size: titleSize});
+  }
+  if(lines[1]){
+    blockLines.push({text: lines[1], font: specFont, size: specSize});
+  }
+
+  const lineHeights = blockLines.map(l => Math.round(l.size * 1.25));
+
+  // Compute baselines bottom-up so the block sits flush with the bottom padding.
+  let baselinesFromBottom = [];
+  let running = 0;
+  for(let i = blockLines.length - 1; i >= 0; i--){
+    running += lineHeights[i];
+    baselinesFromBottom[i] = running - (lineHeights[i] - blockLines[i].size * 0.85);
+    if(i > 0) running += gap;
+  }
+
+  let textAlign = 'left';
+  let x = pad;
+  if(currentTextPosition === 'center'){
+    textAlign = 'center';
+    x = w / 2;
+  } else if(currentTextPosition === 'right'){
+    textAlign = 'right';
+    x = w - pad;
+  }
+  ctx.textAlign = textAlign;
+
+  blockLines.forEach((l, i)=>{
+    ctx.font = l.font;
+    ctx.fillStyle = currentTextColor;
+    ctx.shadowColor = 'rgba(0,0,0,0.75)';
+    ctx.shadowBlur = Math.round(7 * scale);
+    ctx.shadowOffsetY = Math.round(1.5 * scale);
+    ctx.fillText(l.text, x, h - pad - baselinesFromBottom[i]);
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+  });
+  ctx.textAlign = 'left';
+}
+
+downloadBtn.addEventListener('click', ()=>{
+  if(!currentImage) return;
+  const link = document.createElement('a');
+  const ext = currentFileType === 'image/png' ? 'png' : 'jpg';
+  link.download = 'photo-exif.' + ext;
+  link.href = canvas.toDataURL(currentFileType, 0.95);
+  link.click();
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch((err) => {
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
