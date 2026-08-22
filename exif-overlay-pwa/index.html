@@ -344,6 +344,14 @@
         <div class="k">ISO</div>
         <div class="v" id="rIso">—</div>
       </div>
+      <div class="stat">
+        <div class="k">Date</div>
+        <div class="v" id="rDate">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">Time</div>
+        <div class="v" id="rTime">—</div>
+      </div>
     </div>
 
     <div class="style-controls" id="styleControls">
@@ -386,6 +394,8 @@
         <label class="toggle on"><input type="checkbox" data-field="shutter" checked>シャッタースピード</label>
         <label class="toggle on"><input type="checkbox" data-field="focal" checked>画角(焦点距離)</label>
         <label class="toggle on"><input type="checkbox" data-field="iso" checked>ISO</label>
+        <label class="toggle"><input type="checkbox" data-field="date">撮影日</label>
+        <label class="toggle"><input type="checkbox" data-field="time">撮影時刻</label>
       </div>
       <div class="buttons">
         <label class="file-btn" id="reloadBtn" for="fileInput">別の写真を選ぶ</label>
@@ -393,7 +403,7 @@
       </div>
     </div>
 
-    <div class="note">※「画角」は可能な場合35mm換算の焦点距離を、なければ実焦点距離(mm)を表示します。<br>※ EXIF情報が写真に含まれていない項目は表示されません。</div>
+    <div class="note">※「画角」は可能な場合35mm換算の焦点距離を、なければ実焦点距離(mm)を表示します。<br>※ 撮影日・撮影時刻はデフォルトでは非表示です。必要な場合はチェックを入れてください。<br>※ EXIF情報が写真に含まれていない項目は表示されません。</div>
   </div>
 
   <footer>ALL PROCESSING HAPPENS LOCALLY IN YOUR BROWSER — NO UPLOAD</footer>
@@ -415,7 +425,7 @@ const posSelect = document.getElementById('posSelect');
 
 let currentImage = null;
 let currentExif = null;
-let currentFields = { make:false, model:true, aperture:true, shutter:true, focal:true, iso:true };
+let currentFields = { make:false, model:true, aperture:true, shutter:true, focal:true, iso:true, date:false, time:false };
 let currentTextColor = '#ffffff';
 let currentTextScale = 1;
 let currentTextPosition = 'left';
@@ -535,7 +545,7 @@ function formatShutterSpeed(seconds){
 }
 
 function buildStrings(exif){
-  const out = { make:null, model:null, aperture:null, shutter:null, focal:null, iso:null };
+  const out = { make:null, model:null, aperture:null, shutter:null, focal:null, iso:null, date:null, time:null };
 
   const make = (exif.Make||'').trim();
   const model = (exif.Model||'').trim();
@@ -575,6 +585,21 @@ function buildStrings(exif){
     out.iso = 'ISO ' + iso;
   }
 
+  // Shooting date/time: EXIF stores "YYYY:MM:DD HH:MM:SS". Prefer DateTimeOriginal.
+  const rawDT = exif.DateTimeOriginal || exif.DateTimeDigitized || exif.DateTime;
+  if(rawDT){
+    let dtStr = rawDT;
+    if(Object.prototype.toString.call(rawDT) === '[object Date]'){
+      const pad2 = n => String(n).padStart(2,'0');
+      dtStr = `${rawDT.getFullYear()}:${pad2(rawDT.getMonth()+1)}:${pad2(rawDT.getDate())} ${pad2(rawDT.getHours())}:${pad2(rawDT.getMinutes())}:${pad2(rawDT.getSeconds())}`;
+    }
+    const m = String(dtStr).match(/(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+    if(m){
+      out.date = `${m[1]}/${m[2]}/${m[3]}`;
+      out.time = `${m[4]}:${m[5]}`;
+    }
+  }
+
   return out;
 }
 
@@ -592,6 +617,10 @@ function updateReadout(exif){
   document.getElementById('rFocal').classList.toggle('empty', !s.focal);
   document.getElementById('rIso').textContent = s.iso || '検出なし';
   document.getElementById('rIso').classList.toggle('empty', !s.iso);
+  document.getElementById('rDate').textContent = s.date || '検出なし';
+  document.getElementById('rDate').classList.toggle('empty', !s.date);
+  document.getElementById('rTime').textContent = s.time || '検出なし';
+  document.getElementById('rTime').classList.toggle('empty', !s.time);
 }
 
 function render(){
@@ -629,6 +658,11 @@ function render(){
   if(currentFields.iso && s.iso) specParts.push(s.iso);
   if(specParts.length) lines.push(specParts.join('   '));
 
+  const dtParts = [];
+  if(currentFields.date && s.date) dtParts.push(s.date);
+  if(currentFields.time && s.time) dtParts.push(s.time);
+  if(dtParts.length) lines.push(dtParts.join('  '));
+
   if(lines.length === 0) return;
 
   drawOverlay(ctx, w, h, lines);
@@ -646,13 +680,11 @@ function drawOverlay(ctx, w, h, lines){
   const titleFont = `600 ${titleSize}px ui-sans-serif, -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
   const specFont = `500 ${specSize}px ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace`;
 
-  let blockLines = [];
-  if(lines[0]){
-    blockLines.push({text: lines[0], font: titleFont, size: titleSize});
-  }
-  if(lines[1]){
-    blockLines.push({text: lines[1], font: specFont, size: specSize});
-  }
+  let blockLines = lines.map((text, i) => ({
+    text,
+    font: i === 0 ? titleFont : specFont,
+    size: i === 0 ? titleSize : specSize
+  }));
 
   const lineHeights = blockLines.map(l => Math.round(l.size * 1.25));
 
@@ -697,6 +729,7 @@ downloadBtn.addEventListener('click', ()=>{
   link.href = canvas.toDataURL(currentFileType, 0.95);
   link.click();
 });
+
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
