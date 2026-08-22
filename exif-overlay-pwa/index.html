@@ -69,6 +69,7 @@
   }
 
   .dropzone{
+    display: block;
     position: relative;
     border: 1px dashed var(--line);
     border-radius: 2px;
@@ -332,6 +333,10 @@
         <div class="v" id="rAperture">—</div>
       </div>
       <div class="stat">
+        <div class="k">Shutter</div>
+        <div class="v" id="rShutter">—</div>
+      </div>
+      <div class="stat">
         <div class="k">Focal Length</div>
         <div class="v" id="rFocal">—</div>
       </div>
@@ -378,6 +383,7 @@
         <label class="toggle"><input type="checkbox" data-field="make">製造元</label>
         <label class="toggle on"><input type="checkbox" data-field="model" checked>モデル</label>
         <label class="toggle on"><input type="checkbox" data-field="aperture" checked>絞り</label>
+        <label class="toggle on"><input type="checkbox" data-field="shutter" checked>シャッタースピード</label>
         <label class="toggle on"><input type="checkbox" data-field="focal" checked>画角(焦点距離)</label>
         <label class="toggle on"><input type="checkbox" data-field="iso" checked>ISO</label>
       </div>
@@ -387,7 +393,7 @@
       </div>
     </div>
 
-    <div class="note">※「画角」は撮影時の焦点距離(mm)として表示しています。センサーサイズにより実際の画角(°)は異なります。<br>※ EXIF情報が写真に含まれていない項目は表示されません。</div>
+    <div class="note">※「画角」は可能な場合35mm換算の焦点距離を、なければ実焦点距離(mm)を表示します。<br>※ EXIF情報が写真に含まれていない項目は表示されません。</div>
   </div>
 
   <footer>ALL PROCESSING HAPPENS LOCALLY IN YOUR BROWSER — NO UPLOAD</footer>
@@ -409,7 +415,7 @@ const posSelect = document.getElementById('posSelect');
 
 let currentImage = null;
 let currentExif = null;
-let currentFields = { make:false, model:true, aperture:true, focal:true, iso:true };
+let currentFields = { make:false, model:true, aperture:true, shutter:true, focal:true, iso:true };
 let currentTextColor = '#ffffff';
 let currentTextScale = 1;
 let currentTextPosition = 'left';
@@ -518,8 +524,18 @@ async function handleFile(file){
   }
 }
 
+function formatShutterSpeed(seconds){
+  if(!seconds || seconds <= 0) return null;
+  if(seconds >= 1){
+    const v = Math.round(seconds * 10) / 10;
+    return (Number.isInteger(v) ? v.toFixed(0) : v) + 's';
+  }
+  const denom = Math.round(1 / seconds);
+  return '1/' + denom;
+}
+
 function buildStrings(exif){
-  const out = { make:null, model:null, aperture:null, focal:null, iso:null };
+  const out = { make:null, model:null, aperture:null, shutter:null, focal:null, iso:null };
 
   const make = (exif.Make||'').trim();
   const model = (exif.Model||'').trim();
@@ -528,13 +544,29 @@ function buildStrings(exif){
 
   const fnum = exif.FNumber || exif.ApertureValue;
   if(fnum){
-    const v = Math.round(fnum*10)/10;
+    const v = Math.round(Number(fnum)*10)/10;
     out.aperture = 'f/' + (Number.isInteger(v) ? v.toFixed(1) : v);
   }
 
-  const focal = exif.FocalLength;
-  if(focal){
-    const v = Math.round(focal*10)/10;
+  // Shutter speed: prefer ExposureTime (seconds), fall back to APEX ShutterSpeedValue.
+  let expSeconds = null;
+  if(exif.ExposureTime){
+    expSeconds = Number(exif.ExposureTime);
+  } else if(exif.ShutterSpeedValue !== undefined && exif.ShutterSpeedValue !== null){
+    expSeconds = Math.pow(2, -Number(exif.ShutterSpeedValue));
+  }
+  if(expSeconds){
+    out.shutter = formatShutterSpeed(expSeconds);
+  }
+
+  // Focal length: prefer the 35mm-equivalent (matches perceived "angle of view"),
+  // since the raw lens focal length (e.g. ~4-6mm on phones) reads as "wrong" to most people.
+  const focal35 = exif.FocalLengthIn35mmFilm;
+  const focalRaw = exif.FocalLength;
+  if(focal35){
+    out.focal = Math.round(Number(focal35)) + 'mm';
+  } else if(focalRaw){
+    const v = Math.round(Number(focalRaw)*10)/10;
     out.focal = (Number.isInteger(v) ? Math.round(v) : v) + 'mm';
   }
 
@@ -554,6 +586,8 @@ function updateReadout(exif){
   document.getElementById('rModel').classList.toggle('empty', !s.model);
   document.getElementById('rAperture').textContent = s.aperture || '検出なし';
   document.getElementById('rAperture').classList.toggle('empty', !s.aperture);
+  document.getElementById('rShutter').textContent = s.shutter || '検出なし';
+  document.getElementById('rShutter').classList.toggle('empty', !s.shutter);
   document.getElementById('rFocal').textContent = s.focal || '検出なし';
   document.getElementById('rFocal').classList.toggle('empty', !s.focal);
   document.getElementById('rIso').textContent = s.iso || '検出なし';
@@ -590,6 +624,7 @@ function render(){
 
   const specParts = [];
   if(currentFields.aperture && s.aperture) specParts.push(s.aperture);
+  if(currentFields.shutter && s.shutter) specParts.push(s.shutter);
   if(currentFields.focal && s.focal) specParts.push(s.focal);
   if(currentFields.iso && s.iso) specParts.push(s.iso);
   if(specParts.length) lines.push(specParts.join('   '));
