@@ -149,7 +149,20 @@
   .stat{
     background: var(--panel-2);
     padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: inset 3px 0 0 0 transparent;
+    transition: background .15s ease, box-shadow .15s ease, opacity .15s ease;
   }
+  .stat.on{
+    background: #241d10;
+    box-shadow: inset 3px 0 0 0 var(--amber);
+  }
+  .stat.off{
+    opacity: 0.4;
+  }
+  .stat.on .k{ color: var(--amber); }
   .stat .k{
     font-family: var(--mono);
     font-size: 10px;
@@ -226,25 +239,17 @@
     margin-top: 18px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 14px;
     flex-wrap: wrap;
   }
-  .toggles{
-    display:flex;
-    gap: 18px;
-    flex-wrap: wrap;
-  }
-  .toggle{
-    display:flex; align-items:center; gap:7px;
+  .readout-hint{
+    margin-top: 10px;
     font-family: var(--mono);
-    font-size: 11.5px;
+    font-size: 10.5px;
     color: var(--text-dim);
-    cursor:pointer;
-    user-select:none;
+    letter-spacing: 0.02em;
   }
-  .toggle input{ accent-color: var(--amber); }
-  .toggle.on{ color: var(--text); }
 
   .buttons{ display:flex; gap:10px; }
   button.primary, button.ghost, label.file-btn{
@@ -319,40 +324,41 @@
       </div>
     </div>
 
-    <div class="readout">
-      <div class="stat">
+    <div class="readout" id="readout">
+      <div class="stat" data-field="make">
         <div class="k">Make</div>
         <div class="v" id="rMake">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" data-field="model">
         <div class="k">Model</div>
         <div class="v" id="rModel">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" data-field="aperture">
         <div class="k">Aperture</div>
         <div class="v" id="rAperture">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" data-field="shutter">
         <div class="k">Shutter</div>
         <div class="v" id="rShutter">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" data-field="focal">
         <div class="k">Focal Length</div>
         <div class="v" id="rFocal">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" data-field="iso">
         <div class="k">ISO</div>
         <div class="v" id="rIso">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" data-field="date">
         <div class="k">Date</div>
         <div class="v" id="rDate">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" data-field="time">
         <div class="k">Time</div>
         <div class="v" id="rTime">—</div>
       </div>
     </div>
+    <div class="readout-hint">タップして写真に焼き込む項目を選択(点灯 = 表示する)</div>
 
     <div class="style-controls" id="styleControls">
       <div class="ctrl">
@@ -387,16 +393,6 @@
     </div>
 
     <div class="controls">
-      <div class="toggles" id="toggles">
-        <label class="toggle"><input type="checkbox" data-field="make">製造元</label>
-        <label class="toggle on"><input type="checkbox" data-field="model" checked>モデル</label>
-        <label class="toggle on"><input type="checkbox" data-field="aperture" checked>絞り</label>
-        <label class="toggle on"><input type="checkbox" data-field="shutter" checked>シャッタースピード</label>
-        <label class="toggle on"><input type="checkbox" data-field="focal" checked>画角(焦点距離)</label>
-        <label class="toggle on"><input type="checkbox" data-field="iso" checked>ISO</label>
-        <label class="toggle"><input type="checkbox" data-field="date">撮影日</label>
-        <label class="toggle"><input type="checkbox" data-field="time">撮影時刻</label>
-      </div>
       <div class="buttons">
         <label class="file-btn" id="reloadBtn" for="fileInput">別の写真を選ぶ</label>
         <button class="primary" id="downloadBtn">画像を保存</button>
@@ -417,7 +413,7 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const reloadBtn = document.getElementById('reloadBtn');
 const downloadBtn = document.getElementById('downloadBtn');
-const togglesEl = document.getElementById('toggles');
+const readoutEl = document.getElementById('readout');
 const colorInput = document.getElementById('colorInput');
 const swatches = document.getElementById('swatches');
 const sizeSelect = document.getElementById('sizeSelect');
@@ -452,11 +448,12 @@ fileInput.addEventListener('change', e=>{
   if(f) handleFile(f);
 });
 
-togglesEl.querySelectorAll('input[type=checkbox]').forEach(cb=>{
-  cb.addEventListener('change', e=>{
-    const field = e.target.dataset.field;
-    currentFields[field] = e.target.checked;
-    e.target.closest('.toggle').classList.toggle('on', e.target.checked);
+readoutEl.querySelectorAll('.stat').forEach(cell=>{
+  cell.addEventListener('click', ()=>{
+    const field = cell.dataset.field;
+    currentFields[field] = !currentFields[field];
+    cell.classList.toggle('on', currentFields[field]);
+    cell.classList.toggle('off', !currentFields[field]);
     render();
   });
 });
@@ -621,6 +618,12 @@ function updateReadout(exif){
   document.getElementById('rDate').classList.toggle('empty', !s.date);
   document.getElementById('rTime').textContent = s.time || '検出なし';
   document.getElementById('rTime').classList.toggle('empty', !s.time);
+
+  readoutEl.querySelectorAll('.stat').forEach(cell=>{
+    const field = cell.dataset.field;
+    cell.classList.toggle('on', !!currentFields[field]);
+    cell.classList.toggle('off', !currentFields[field]);
+  });
 }
 
 function render(){
