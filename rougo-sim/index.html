@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老後資金シミュレーター２</title>
+<meta name="description" content="毎月の生活費や旅行、車の買い替えなど、周期がバラバラな収支を入力するだけで、老後の資産推移を年齢別にひと目で確認できるシミュレーターです。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===== ヘッダー ===== -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" width="34" height="34">
+          <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <path d="M20 9 L20 20 L27 25" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>老後資金シミュレーター２</h1>
+        <p class="tagline">お金が「何歳まで持つか」を、ひと目で。</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="画面切り替え">
+      <button class="tab-btn is-active" id="tabBtn-input" role="tab" aria-selected="true" aria-controls="panel-input">入力</button>
+      <button class="tab-btn" id="tabBtn-result" role="tab" aria-selected="false" aria-controls="panel-result">結果</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== 入力画面 ===== -->
+    <section id="panel-input" class="panel is-active" role="tabpanel" aria-labelledby="tabBtn-input">
+
+      <!-- 基本設定 -->
+      <div class="card">
+        <h2 class="card-title"><span class="card-index">01</span>基本設定</h2>
+        <div class="grid grid-2">
+          <label class="field">
+            <span class="field-label">現在の年齢</span>
+            <span class="field-input"><input type="number" id="in-currentAge" min="0" max="120" value="56"><span class="unit">歳</span></span>
+          </label>
+          <label class="field">
+            <span class="field-label">退職年齢</span>
+            <span class="field-input"><input type="number" id="in-retireAge" min="0" max="120" value="60"><span class="unit">歳</span></span>
+          </label>
+          <label class="field">
+            <span class="field-label">試算終了年齢</span>
+            <span class="field-input"><input type="number" id="in-endAge" min="0" max="120" value="90"><span class="unit">歳</span></span>
+          </label>
+          <label class="field">
+            <span class="field-label">現在の金融資産</span>
+            <span class="field-input"><input type="number" id="in-currentAssets" min="0" value="4000"><span class="unit">万円</span></span>
+          </label>
+          <label class="field">
+            <span class="field-label">退職金（見込み）</span>
+            <span class="field-input"><input type="number" id="in-lumpSum" min="0" value="2000"><span class="unit">万円</span></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 収入 -->
+      <div class="card">
+        <h2 class="card-title"><span class="card-index">02</span>収入</h2>
+        <p class="card-note">年金や給与など、これから受け取る予定のお金を入力してください。</p>
+        <div id="income-list" class="item-list"></div>
+        <button type="button" class="btn-add" id="btn-add-income">＋ 収入を追加</button>
+      </div>
+
+      <!-- 支出 -->
+      <div class="card">
+        <h2 class="card-title"><span class="card-index">03</span>支出</h2>
+        <p class="card-note">生活費や旅行、車の買い替えなど、使う予定のお金を、いつもの単位のまま入力してください。</p>
+        <div id="expense-list" class="item-list"></div>
+        <button type="button" class="btn-add" id="btn-add-expense">＋ 支出を追加</button>
+      </div>
+
+      <!-- 詳細設定 -->
+      <details class="card card-collapsible">
+        <summary class="card-title"><span class="card-index">04</span>詳細設定（物価・運用利回り）</summary>
+        <div class="grid grid-2" style="margin-top:14px;">
+          <label class="field">
+            <span class="field-label">物価上昇率</span>
+            <span class="field-input"><input type="number" id="in-inflation" min="0" max="20" step="0.1" value="2.0"><span class="unit">％／年</span></span>
+          </label>
+          <label class="field">
+            <span class="field-label">資産運用利回り</span>
+            <span class="field-input"><input type="number" id="in-returnRate" min="0" max="20" step="0.1" value="2.0"><span class="unit">％／年</span></span>
+          </label>
+        </div>
+        <p class="hint">支出額は、この物価上昇率にもとづいて毎年自動的に増えていきます。個々の項目ごとに設定する必要はありません。運用利回りは「資産運用を想定した場合」の増え方の目安です。</p>
+      </details>
+
+      <div class="data-actions">
+        <button type="button" class="btn-ghost" id="btn-save">データを保存</button>
+        <button type="button" class="btn-ghost" id="btn-load">データを読み込む</button>
+        <button type="button" class="btn-ghost btn-ghost-danger" id="btn-reset">初期状態に戻す</button>
+      </div>
+
+      <div id="global-errors" class="global-errors" hidden aria-live="polite"></div>
+      <button type="button" class="btn-primary btn-calc" id="btn-calculate">この内容で試算する</button>
+      <p class="save-status" id="save-status" aria-live="polite"></p>
+    </section>
+
+    <!-- ===== 結果画面 ===== -->
+    <section id="panel-result" class="panel" role="tabpanel" aria-labelledby="tabBtn-result">
+
+      <div class="card chart-card">
+        <h2 class="card-title-plain">年齢別の金融資産残高</h2>
+        <div id="depletion-banner" class="depletion-banner" hidden></div>
+        <div class="chart-wrap">
+          <canvas id="assetChart" height="320"></canvas>
+        </div>
+        <p class="chart-legend-note">縦軸：金融資産残高（万円）／横軸：年齢　　点線は資産がゼロになるラインです</p>
+      </div>
+
+      <div class="summary-grid" id="summary-grid"></div>
+
+      <div class="card">
+        <h2 class="card-title-plain">年齢別の詳細</h2>
+        <div class="table-wrap">
+          <table class="detail-table" id="detail-table">
+            <thead>
+              <tr>
+                <th>年齢</th>
+                <th>年間収入</th>
+                <th>年間支出</th>
+                <th>年間収支</th>
+                <th>年末資産</th>
+              </tr>
+            </thead>
+            <tbody id="detail-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <button type="button" class="btn-ghost btn-back" id="btn-back-to-input">入力内容を修正する</button>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>この試算は、入力内容にもとづく概算です。将来の物価・運用成果・年金額などを保証するものではありません。実際の資金計画については、専門家にもご相談ください。</p>
+  </footer>
+</div>
+
+<!-- テンプレート（収入・支出の行） -->
+<template id="tpl-item-row">
+  <div class="item-row" data-id="">
+    <div class="item-row-main">
+      <label class="field field-name">
+        <span class="field-label">項目名</span>
+        <input type="text" class="f-name" placeholder="例：生活費">
+      </label>
+      <label class="field field-amount">
+        <span class="field-label">金額</span>
+        <span class="field-input"><input type="number" class="f-amount" min="0" value="0"><span class="unit">万円</span></span>
+      </label>
+      <label class="field field-period">
+        <span class="field-label">周期</span>
+        <select class="f-period">
+          <option value="month">毎月</option>
+          <option value="year">毎年</option>
+          <option value="everyN">N年ごと</option>
+          <option value="once">一時支出</option>
+        </select>
+      </label>
+      <label class="field field-n" hidden>
+        <span class="field-label">周期（年）</span>
+        <span class="field-input"><input type="number" class="f-n" min="1" value="5"><span class="unit">年ごと</span></span>
+      </label>
+    </div>
+    <div class="item-row-age">
+      <label class="field field-age-start">
+        <span class="field-label f-age-start-label">開始年齢</span>
+        <span class="field-input"><input type="number" class="f-startAge" min="0" max="120" value="60"><span class="unit">歳</span></span>
+      </label>
+      <span class="age-sep">～</span>
+      <label class="field field-age-end">
+        <span class="field-label">終了年齢</span>
+        <span class="field-input"><input type="number" class="f-endAge" min="0" max="120" value="90"><span class="unit">歳</span></span>
+      </label>
+      <button type="button" class="btn-remove" aria-label="この項目を削除">削除</button>
+    </div>
+    <p class="item-error" hidden></p>
+  </div>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
