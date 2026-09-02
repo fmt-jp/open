@@ -248,11 +248,17 @@ select.f-period{
 }
 .item-row-main{
   display:grid;
-  grid-template-columns: 1.3fr 1fr 0.9fr;
+  grid-template-columns: 1.3fr 1fr 0.8fr 0.8fr;
   gap: 10px;
 }
-.item-row-main:has(.field-n:not([hidden])){
-  grid-template-columns: 1.3fr 1fr 0.8fr 0.8fr;
+.field-n.is-disabled .field-label{ color: var(--ink-faint); }
+.field-n.is-disabled .field-input{
+  background: var(--line);
+  opacity: 0.55;
+}
+.field-n.is-disabled .f-n{
+  color: var(--ink-faint);
+  cursor: not-allowed;
 }
 .item-row-age{
   display:flex;
@@ -470,7 +476,6 @@ select.f-period{
 @media (max-width: 620px){
   .grid-2{ grid-template-columns: 1fr; }
   .item-row-main{ grid-template-columns: 1fr 1fr; }
-  .item-row-main:has(.field-n:not([hidden])){ grid-template-columns: 1fr 1fr; }
   .field-name{ grid-column: 1 / -1; }
   .summary-grid{ grid-template-columns: 1fr; }
   .brand-text h1{ font-size: 19px; }

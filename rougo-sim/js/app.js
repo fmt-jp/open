@@ -152,7 +152,9 @@
 
     function syncPeriodUI(){
       const p = periodSelect.value;
-      nField.hidden = p !== "everyN";
+      const nEnabled = p === "everyN";
+      nInput.disabled = !nEnabled;
+      nField.classList.toggle("is-disabled", !nEnabled);
       if (p === "once"){
         endField.hidden = true;
         ageSep.hidden = true;
