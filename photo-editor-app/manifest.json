@@ -1,0 +1,12 @@
+{
+  "name": "写真かくす加工",
+  "short_name": "かくす加工",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#14171a",
+  "theme_color": "#1b1f24",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

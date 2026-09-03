@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>写真かくす加工</title>
+<meta name="theme-color" content="#1b1f24">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===== 上部バー ===== -->
+  <header id="topbar">
+    <button id="btn-reset" class="icon-btn" title="リセット" aria-label="リセット">
+      <svg viewBox="0 0 24 24"><path d="M12 5V2L7 7l5 5V9a5 5 0 1 1-5 5H5a7 7 0 1 0 7-9z"/></svg>
+    </button>
+    <div id="filename">写真を選択してください</div>
+    <button id="btn-save" class="icon-btn primary" title="保存" aria-label="保存" disabled>
+      <svg viewBox="0 0 24 24"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zM12 19a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM7 5h7v4H7V5z"/></svg>
+    </button>
+  </header>
+
+  <!-- ===== 写真未選択時の画面 ===== -->
+  <section id="picker-screen">
+    <div class="picker-card">
+      <div class="picker-icon">🖼️</div>
+      <h1>写真かくす加工</h1>
+      <p>トリミング・EXIF焼き込み・顔/ナンバー隠しを<br>すべて端末内だけで行います。写真は外部へ送信されません。</p>
+      <label class="btn-primary" for="file-input">写真を選ぶ</label>
+      <input type="file" id="file-input" accept="image/*">
+      <label class="btn-secondary" for="camera-input">カメラで撮影</label>
+      <input type="file" id="camera-input" accept="image/*" capture="environment">
+    </div>
+  </section>
+
+  <!-- ===== 編集画面 ===== -->
+  <section id="editor-screen" hidden>
+
+    <div id="canvas-wrap">
+      <canvas id="preview"></canvas>
+      <!-- クロップ用オーバーレイ -->
+      <div id="crop-overlay" hidden>
+        <div id="crop-frame"></div>
+      </div>
+      <!-- 検出枠オーバーレイ(顔/ナンバー) -->
+      <svg id="hide-overlay" hidden></svg>
+      <div id="canvas-hint" class="hint" hidden></div>
+    </div>
+
+    <!-- ===== コンテキストパネル(モードごとの操作) ===== -->
+    <div id="panel-crop" class="panel" hidden>
+      <div class="panel-row aspect-row">
+        <button class="chip" data-aspect="free">自由</button>
+        <button class="chip" data-aspect="orig">元比率</button>
+        <button class="chip" data-aspect="1:1">1:1</button>
+        <button class="chip" data-aspect="4:3">4:3</button>
+        <button class="chip" data-aspect="3:4">3:4</button>
+        <button class="chip" data-aspect="16:9">16:9</button>
+        <button class="chip" data-aspect="9:16">9:16</button>
+      </div>
+      <div class="panel-row action-row">
+        <button id="crop-cancel" class="btn-flat">キャンセル</button>
+        <button id="crop-apply" class="btn-flat primary">適用</button>
+      </div>
+    </div>
+
+    <div id="panel-exif" class="panel" hidden>
+      <div id="exif-empty" class="hint-text" hidden>この写真にはEXIF情報が見つかりませんでした。</div>
+      <div id="exif-fields" class="panel-row toggle-row"></div>
+
+      <div class="panel-row">
+        <span class="panel-label">位置</span>
+        <div class="segmented" id="exif-position">
+          <button data-pos="left" class="active">左</button>
+          <button data-pos="center">中央</button>
+          <button data-pos="right">右</button>
+        </div>
+      </div>
+
+      <div class="panel-row">
+        <span class="panel-label">文字サイズ</span>
+        <input type="range" id="exif-size" min="12" max="64" value="26">
+      </div>
+
+      <div class="panel-row">
+        <span class="panel-label">文字色</span>
+        <div class="segmented" id="exif-color">
+          <button data-color="white" class="active">白</button>
+          <button data-color="black">黒</button>
+        </div>
+        <input type="color" id="exif-color-custom" value="#ffffff" title="カスタム色">
+      </div>
+
+      <div class="panel-row">
+        <span class="panel-label">縁取り</span>
+        <div class="segmented" id="exif-outline">
+          <button data-outline="white-black" class="active">白文字+黒縁</button>
+          <button data-outline="black-white">黒文字+白縁</button>
+          <button data-outline="none">なし</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-hide" class="panel" hidden>
+      <div id="hide-status" class="hint-text">検出待機中…</div>
+      <div class="panel-row action-row">
+        <button id="hide-detect" class="btn-flat">🔍 自動検出</button>
+        <button id="hide-add" class="btn-flat">＋追加</button>
+      </div>
+      <div class="panel-row">
+        <span class="panel-label">隠し方</span>
+        <div class="segmented" id="hide-method">
+          <button data-method="mosaic" class="active">モザイク</button>
+          <button data-method="icon">アイコン</button>
+        </div>
+      </div>
+      <div id="hide-list" class="hide-list"></div>
+    </div>
+
+    <!-- ===== 下部固定メニュー ===== -->
+    <nav id="bottombar">
+      <button class="tab-btn active" data-mode="crop">
+        <span class="tab-icon">✂️</span><span>トリミング</span>
+      </button>
+      <button class="tab-btn" data-mode="exif">
+        <span class="tab-icon">🏷️</span><span>EXIF</span>
+      </button>
+      <button class="tab-btn" data-mode="hide">
+        <span class="tab-icon">🛡️</span><span>隠す</span>
+      </button>
+    </nav>
+  </section>
+
+  <div id="toast"></div>
+  <div id="loading-overlay" hidden><div class="spinner"></div><div id="loading-text">読み込み中…</div></div>
+</div>
+
+<!-- 外部ライブラリ: いずれもUIロジックのみで、写真データ自体は一切送信しない -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
