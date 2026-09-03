@@ -119,9 +119,7 @@
   /* ---------------------------------------------------------------------
      収入・支出の行 UI
      --------------------------------------------------------------------- */
-  const PERIOD_LABEL = {
-    month: "毎月", year: "毎年", everyN: "N年ごと", once: "一時支出"
-  };
+  const ONCE_LABEL = { income: "一時収入", expense: "一時支出" };
 
   function createItemRow(item, kind){
     const frag = el.tplItemRow.content.cloneNode(true);
@@ -146,6 +144,8 @@
     nameInput.placeholder = kind === "income" ? "例：年金" : "例：生活費";
     amountInput.value = item.amount;
     periodSelect.value = item.period;
+    const onceOption = periodSelect.querySelector('option[value="once"]');
+    if (onceOption) onceOption.textContent = ONCE_LABEL[kind] || "一時支出";
     nInput.value = item.n;
     startInput.value = item.startAge;
     endInput.value = item.endAge;
