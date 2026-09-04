@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>写真かくす加工</title>
+<title>PixelVeil</title>
 <meta name="theme-color" content="#1b1f24">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="style.css">
@@ -29,8 +29,16 @@
   <!-- ===== 写真未選択時の画面 ===== -->
   <section id="picker-screen">
     <div class="picker-card">
-      <div class="picker-icon">🖼️</div>
-      <h1>写真かくす加工</h1>
+      <div class="picker-icon">
+        <svg viewBox="0 0 64 64" width="56" height="56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+          <rect x="6" y="10" width="44" height="34" rx="6"/>
+          <circle cx="20" cy="22" r="4"/>
+          <path d="M10 38 L24 26 L34 34 L44 24 L50 34"/>
+          <path d="M40 33 L52.5 33 L52.5 45.5 C52.5 51.5 46.5 55.5 46.5 55.5 C46.5 55.5 40 51.5 40 45.5 Z" fill="#14171a" stroke-width="2"/>
+        </svg>
+      </div>
+      <h1>PixelVeil</h1>
+      <p class="picker-subtitle">写真かくす加工</p>
       <p>トリミング・EXIF焼き込み・顔/ナンバー隠しを<br>すべて端末内だけで行います。写真は外部へ送信されません。</p>
       <label class="btn-primary" for="file-input">写真を選ぶ</label>
       <input type="file" id="file-input" accept="image/*">
@@ -82,6 +90,9 @@
     <div id="panel-exif" class="panel" hidden>
       <div id="exif-empty" class="hint-text" hidden>この写真にはEXIF情報が見つかりませんでした。</div>
       <div id="exif-fields" class="panel-row toggle-row"></div>
+      <div class="panel-row">
+        <button id="exif-disable-all" class="btn-flat">すべて無効にする</button>
+      </div>
 
       <div class="panel-row">
         <span class="panel-label">位置</span>
@@ -124,7 +135,10 @@
     <div id="panel-hide" class="panel" hidden>
       <div id="hide-status" class="hint-text">検出待機中…</div>
       <div class="panel-row action-row">
-        <button id="hide-detect" class="btn-flat">🔍 自動検出</button>
+        <button id="hide-detect" class="btn-flat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-3px;margin-right:4px"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          自動検出
+        </button>
         <button id="hide-add" class="btn-flat">＋追加</button>
       </div>
       <div class="panel-row">
@@ -137,12 +151,12 @@
       <div class="panel-row" id="hide-icon-row" hidden>
         <span class="panel-label">アイコン</span>
         <div class="icon-choice" id="hide-icon-choice">
-          <button data-icon="🕶️" class="active">🕶️</button>
-          <button data-icon="⬛">⬛</button>
-          <button data-icon="😶">😶</button>
-          <button data-icon="😷">😷</button>
-          <button data-icon="🚫">🚫</button>
-          <button data-icon="❓">❓</button>
+          <button data-icon="sunglasses" class="active"><canvas class="icon-preview" width="28" height="28"></canvas></button>
+          <button data-icon="block"><canvas class="icon-preview" width="28" height="28"></canvas></button>
+          <button data-icon="mute"><canvas class="icon-preview" width="28" height="28"></canvas></button>
+          <button data-icon="mask"><canvas class="icon-preview" width="28" height="28"></canvas></button>
+          <button data-icon="noentry"><canvas class="icon-preview" width="28" height="28"></canvas></button>
+          <button data-icon="question"><canvas class="icon-preview" width="28" height="28"></canvas></button>
         </div>
       </div>
       <div id="hide-list" class="hide-list"></div>
@@ -151,13 +165,16 @@
     <!-- ===== 下部固定メニュー ===== -->
     <nav id="bottombar">
       <button class="tab-btn active" data-mode="crop">
-        <span class="tab-icon">✂️</span><span>トリミング</span>
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17 15h2V7c0-1.1-.9-2-2-2H9v2h8v8zM7 17V1H5v4H1v2h4v10c0 1.1.9 2 2 2h10v4h2v-4h4v-2H7z"/></svg>
+        <span>トリミング</span>
       </button>
       <button class="tab-btn" data-mode="exif">
-        <span class="tab-icon">🏷️</span><span>EXIF</span>
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16zM16 17H5V7h11l3.55 5L16 17z"/></svg>
+        <span>EXIF</span>
       </button>
       <button class="tab-btn" data-mode="hide">
-        <span class="tab-icon">🛡️</span><span>隠す</span>
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+        <span>隠す</span>
       </button>
     </nav>
   </section>

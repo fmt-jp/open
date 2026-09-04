@@ -55,6 +55,7 @@ const els = {
   exifOutline: $('#exif-outline'),
   exifApply:  $('#exif-apply'),
   exifCancel: $('#exif-cancel'),
+  exifDisableAll: $('#exif-disable-all'),
   hideStatus: $('#hide-status'),
   hideDetect: $('#hide-detect'),
   hideAdd:    $('#hide-add'),
@@ -89,7 +90,7 @@ const state = {
   },
   hideRegions: [],         // { id, x,y,w,h (workingBase基準), type:'face'|'plate'|'manual', method:'mosaic'|'icon', icon, enabled }
   hideMethod: 'mosaic',
-  hideIcon: '🕶️',
+  hideIcon: 'sunglasses',
   faceModelReady: false,
   detecting: false,
 };
@@ -569,6 +570,13 @@ els.exifOutline.addEventListener('click', e => {
   renderFinal();
 });
 
+els.exifDisableAll.addEventListener('click', () => {
+  Object.keys(state.exif.fields).forEach(k => { state.exif.fields[k] = false; });
+  buildExifFieldChips();
+  renderFinal();
+  toast('EXIF情報をすべて無効にしました');
+});
+
 els.exifApply.addEventListener('click', () => {
   exifSnapshot = JSON.parse(JSON.stringify(state.exif));
   toast('EXIF設定を適用しました');
@@ -872,15 +880,97 @@ function drawMosaic(targetCtx, sourceCanvas, x, y, w, h) {
   targetCtx.restore();
 }
 
-function drawIcon(targetCtx, x, y, w, h, iconChar) {
+/* --- 隠す用アイコン(モノトーンの自作ベクター図形。絵文字フォントに依存しない) --- */
+const HIDE_ICON_DEFS = {
+  sunglasses: { label: 'サングラス', draw: drawIconSunglasses },
+  block:      { label: '塗りつぶし', draw: drawIconBlock },
+  mute:       { label: '無表情',     draw: drawIconMute },
+  mask:       { label: 'マスク',     draw: drawIconMask },
+  noentry:    { label: '禁止',       draw: drawIconNoEntry },
+  question:   { label: 'はてな',     draw: drawIconQuestion },
+};
+
+function drawIconSunglasses(c, x, y, w, h) {
+  const cx = x + w / 2, cy = y + h / 2, s = Math.min(w, h);
+  c.fillStyle = '#f4f6f8'; c.strokeStyle = '#f4f6f8';
+  c.lineWidth = s * 0.055; c.lineCap = 'round';
+  const lensW = s * 0.32, lensH = s * 0.22, gap = s * 0.10, ly = cy - lensH / 2;
+  roundRect(c, cx - gap / 2 - lensW, ly, lensW, lensH, lensH * 0.35); c.fill();
+  roundRect(c, cx + gap / 2, ly, lensW, lensH, lensH * 0.35); c.fill();
+  c.beginPath(); c.moveTo(cx - gap / 2, cy - lensH * 0.35); c.lineTo(cx + gap / 2, cy - lensH * 0.35); c.stroke();
+  c.beginPath(); c.moveTo(cx - gap / 2 - lensW, cy - lensH * 0.1); c.lineTo(cx - gap / 2 - lensW - s * 0.14, cy - lensH * 0.35); c.stroke();
+  c.beginPath(); c.moveTo(cx + gap / 2 + lensW, cy - lensH * 0.1); c.lineTo(cx + gap / 2 + lensW + s * 0.14, cy - lensH * 0.35); c.stroke();
+}
+
+function drawIconBlock(c, x, y, w, h) {
+  const s = Math.min(w, h);
+  c.fillStyle = '#f4f6f8';
+  roundRect(c, x + w / 2 - s * 0.34, y + h / 2 - s * 0.15, s * 0.68, s * 0.30, s * 0.05);
+  c.fill();
+}
+
+function drawIconMute(c, x, y, w, h) {
+  const cx = x + w / 2, cy = y + h / 2, s = Math.min(w, h);
+  c.strokeStyle = '#f4f6f8'; c.fillStyle = '#f4f6f8';
+  c.lineWidth = s * 0.06; c.lineCap = 'round';
+  c.beginPath(); c.arc(cx, cy, s * 0.32, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.arc(cx - s * 0.11, cy - s * 0.06, s * 0.035, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.arc(cx + s * 0.11, cy - s * 0.06, s * 0.035, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.moveTo(cx - s * 0.12, cy + s * 0.13); c.lineTo(cx + s * 0.12, cy + s * 0.13); c.stroke();
+}
+
+function drawIconMask(c, x, y, w, h) {
+  const cx = x + w / 2, cy = y + h / 2, s = Math.min(w, h);
+  c.fillStyle = '#f4f6f8';
+  const mw = s * 0.62, mh = s * 0.36;
+  roundRect(c, cx - mw / 2, cy - mh / 2, mw, mh, mh * 0.45);
+  c.fill();
+  c.strokeStyle = 'rgba(20,23,26,.55)'; c.lineWidth = s * 0.02;
+  c.beginPath();
+  for (let i = 1; i <= 2; i++) {
+    const ly = cy - mh / 2 + mh * (i / 3);
+    c.moveTo(cx - mw / 2 + mw * 0.1, ly); c.lineTo(cx + mw / 2 - mw * 0.1, ly);
+  }
+  c.stroke();
+}
+
+function drawIconNoEntry(c, x, y, w, h) {
+  const cx = x + w / 2, cy = y + h / 2, s = Math.min(w, h);
+  c.strokeStyle = '#f4f6f8'; c.lineWidth = s * 0.09; c.lineCap = 'round';
+  c.beginPath(); c.arc(cx, cy, s * 0.32, 0, Math.PI * 2); c.stroke();
+  const r = s * 0.32 * 0.7;
+  c.beginPath(); c.moveTo(cx - r, cy - r); c.lineTo(cx + r, cy + r); c.stroke();
+}
+
+function drawIconQuestion(c, x, y, w, h) {
+  const cx = x + w / 2, cy = y + h / 2, s = Math.min(w, h);
+  c.fillStyle = '#f4f6f8';
+  c.font = `700 ${Math.round(s * 0.55)}px -apple-system, sans-serif`;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('?', cx, cy + s * 0.03);
+}
+
+// アイコン選択パレットのミニプレビューを描画(絵文字ではなく上記のベクター図形を使う)
+function paintIconChoicePreviews() {
+  $$('#hide-icon-choice canvas').forEach(cv => {
+    const key = cv.closest('button').dataset.icon;
+    const pctx = cv.getContext('2d');
+    pctx.clearRect(0, 0, cv.width, cv.height);
+    pctx.fillStyle = '#1c2024';
+    roundRect(pctx, 0, 0, cv.width, cv.height, 6);
+    pctx.fill();
+    (HIDE_ICON_DEFS[key] || HIDE_ICON_DEFS.sunglasses).draw(pctx, 0, 0, cv.width, cv.height);
+  });
+}
+paintIconChoicePreviews();
+
+function drawIcon(targetCtx, x, y, w, h, iconKey) {
   targetCtx.save();
-  targetCtx.fillStyle = '#1a1d21';
+  targetCtx.fillStyle = '#14171a';
   roundRect(targetCtx, x, y, w, h, Math.min(w, h) * 0.15);
   targetCtx.fill();
-  targetCtx.font = `${Math.min(w, h) * 0.75}px sans-serif`;
-  targetCtx.textAlign = 'center';
-  targetCtx.textBaseline = 'middle';
-  targetCtx.fillText(iconChar || state.hideIcon, x + w / 2, y + h / 2 + h * 0.03);
+  const def = HIDE_ICON_DEFS[iconKey] || HIDE_ICON_DEFS.sunglasses;
+  def.draw(targetCtx, x, y, w, h);
   targetCtx.restore();
 }
 function roundRect(c, x, y, w, h, r) {
@@ -929,9 +1019,9 @@ els.btnReset.addEventListener('click', () => {
   state.workingBase = cloneCanvas(state.originalBase);
   state.hideRegions = [];
   state.hideMethod = 'mosaic';
-  state.hideIcon = '🕶️';
+  state.hideIcon = 'sunglasses';
   $$('button', els.hideMethod).forEach(b => b.classList.toggle('active', b.dataset.method === 'mosaic'));
-  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('active', b.dataset.icon === '🕶️'));
+  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('active', b.dataset.icon === 'sunglasses'));
   els.hideIconRow.hidden = true;
   resetExifSettings();
   buildExifFieldChips();
@@ -968,9 +1058,12 @@ els.btnSave.addEventListener('click', () => {
 window.addEventListener('error', e => { console.error(e.error || e.message); hideLoading(); });
 window.addEventListener('unhandledrejection', e => { console.error(e.reason); hideLoading(); });
 
-/* ---------- PWA: Service Worker(任意・オフライン対応) ---------- */
+/* ---------- Service Worker: 過去の古いキャッシュが残っている端末のためだけに後始末する ----------
+   このアプリは今後 Service Worker によるキャッシュを使わない(キャッシュの固着で表示が更新
+   されない問題が繰り返し発生したため)。sw.js は自己解除するだけの内容にしてあり、
+   既に登録されてしまっている端末からは自動的に消える。新規訪問者には登録しない。 */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
   });
 }

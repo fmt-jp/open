@@ -1,6 +1,6 @@
 {
-  "name": "写真かくす加工",
-  "short_name": "かくす加工",
+  "name": "PixelVeil",
+  "short_name": "PixelVeil",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#14171a",
