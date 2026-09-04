@@ -882,10 +882,7 @@ function drawMosaic(targetCtx, sourceCanvas, x, y, w, h) {
 
 function drawIcon(targetCtx, x, y, w, h, iconChar) {
   targetCtx.save();
-  targetCtx.fillStyle = '#1a1d21';
-  roundRect(targetCtx, x, y, w, h, Math.min(w, h) * 0.15);
-  targetCtx.fill();
-  targetCtx.font = `${Math.min(w, h) * 0.75}px sans-serif`;
+  targetCtx.font = `${Math.min(w, h) * 0.9}px sans-serif`;
   targetCtx.textAlign = 'center';
   targetCtx.textBaseline = 'middle';
   targetCtx.fillText(iconChar || state.hideIcon, x + w / 2, y + h / 2 + h * 0.03);
