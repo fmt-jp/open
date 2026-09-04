@@ -88,12 +88,13 @@ body{
 }
 
 /* crop overlay */
-#crop-overlay{ position:absolute; inset:0; pointer-events:none; }
+#crop-overlay{ position:absolute; inset:0; }
 #crop-frame{
-  position:absolute; border:2px solid var(--accent);
+  position:absolute; border:2px solid var(--accent); touch-action:none;
   box-shadow:0 0 0 2000px rgba(0,0,0,.55);
+  cursor:move;
 }
-#crop-frame::before,#crop-frame::after{ content:""; position:absolute; inset:0; }
+#crop-frame::before,#crop-frame::after{ content:""; position:absolute; inset:0; pointer-events:none; }
 #crop-frame::before{
   background-image:
     linear-gradient(to right, rgba(255,255,255,.5) 1px, transparent 1px),
@@ -105,10 +106,19 @@ body{
   background-size:100% 33.333%;
 }
 .crop-handle{
-  position:absolute; width:22px; height:22px; margin:-11px;
-  background:var(--accent); border-radius:50%; pointer-events:auto;
+  position:absolute; width:26px; height:26px; margin:-13px;
+  background:var(--accent); border-radius:50%; touch-action:none;
   box-shadow:0 0 0 4px rgba(0,0,0,.35);
 }
+.crop-handle[data-handle="n"]{ top:0; left:50%; cursor:ns-resize; }
+.crop-handle[data-handle="s"]{ top:100%; left:50%; cursor:ns-resize; }
+.crop-handle[data-handle="e"]{ top:50%; left:100%; cursor:ew-resize; }
+.crop-handle[data-handle="w"]{ top:50%; left:0; cursor:ew-resize; }
+.crop-handle[data-handle="nw"]{ top:0; left:0; cursor:nwse-resize; }
+.crop-handle[data-handle="se"]{ top:100%; left:100%; cursor:nwse-resize; }
+.crop-handle[data-handle="ne"]{ top:0; left:100%; cursor:nesw-resize; }
+.crop-handle[data-handle="sw"]{ top:100%; left:0; cursor:nesw-resize; }
+.crop-handle.hidden-handle{ display:none; }
 
 /* hide overlay */
 #hide-overlay{ position:absolute; inset:0; width:100%; height:100%; }
@@ -160,6 +170,14 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 .toggle-chip.active{ background:rgba(232,163,61,.18); color:var(--accent); border-color:var(--accent); }
 
 .hint-text{ font-size:13px; color:var(--ink-dim); padding:6px 0; }
+
+.icon-choice{ display:flex; gap:8px; flex-wrap:wrap; }
+.icon-choice button{
+  width:44px; height:44px; font-size:22px; border-radius:10px;
+  border:1px solid var(--line); background:var(--panel-2);
+  display:flex; align-items:center; justify-content:center;
+}
+.icon-choice button.active{ border-color:var(--accent); background:rgba(232,163,61,.18); }
 
 .hide-list{ display:flex; flex-direction:column; gap:6px; max-height:110px; overflow-y:auto; }
 .hide-item{

@@ -33,6 +33,7 @@ const els = {
   fileInput:    $('#file-input'),
   cameraInput:  $('#camera-input'),
   filename:     $('#filename'),
+  btnClosePhoto: $('#btn-close-photo'),
   btnReset:     $('#btn-reset'),
   btnSave:      $('#btn-save'),
   canvasWrap:   $('#canvas-wrap'),
@@ -52,10 +53,14 @@ const els = {
   exifColor:  $('#exif-color'),
   exifColorCustom: $('#exif-color-custom'),
   exifOutline: $('#exif-outline'),
+  exifApply:  $('#exif-apply'),
+  exifCancel: $('#exif-cancel'),
   hideStatus: $('#hide-status'),
   hideDetect: $('#hide-detect'),
   hideAdd:    $('#hide-add'),
   hideMethod: $('#hide-method'),
+  hideIconRow: $('#hide-icon-row'),
+  hideIconChoice: $('#hide-icon-choice'),
   hideList:   $('#hide-list'),
   toast:      $('#toast'),
   loading:    $('#loading-overlay'),
@@ -68,11 +73,11 @@ const state = {
   mode: 'crop',
   originalBase: null,     // canvas: 元写真(向き補正済・長辺MAX_EDIT_DIM以下)
   exifData: null,         // exif-js が読み取った生データ
-  crop: {                 // 現在の(未適用)クロップ表示状態。座標は originalBase 基準
+  crop: {                 // 現在のクロップ枠の設定。座標は originalBase 基準
     aspect: 'free',
-    srcX: 0, srcY: 0, srcW: 0, srcH: 0,
   },
-  appliedCropRect: null,  // 直近に「適用」されたクロップ範囲(originalBase基準)。nullなら全体
+  cropFrame: { x: 0, y: 0, w: 0, h: 0 }, // 現在(未適用含む)のクロップ枠。originalBase基準
+  appliedCropRect: null,  // 直近に「適用」されたクロップ範囲(originalBase基準+aspect)。nullなら全体
   workingBase: null,      // canvas: クロップ確定後の画像(EXIF/隠す処理の土台)
   exif: {                 // 焼き込み設定
     fields: {},           // { datetime:true, make:false, ... }
@@ -82,13 +87,16 @@ const state = {
     colorPreset: 'white',
     outline: 'white-black',
   },
-  hideRegions: [],         // { id, x,y,w,h (workingBase基準), type:'face'|'plate'|'manual', method:'mosaic'|'icon', enabled }
+  hideRegions: [],         // { id, x,y,w,h (workingBase基準), type:'face'|'plate'|'manual', method:'mosaic'|'icon', icon, enabled }
   hideMethod: 'mosaic',
+  hideIcon: '🕶️',
   faceModelReady: false,
   detecting: false,
 };
 
 let regionSeq = 1;
+let cropSnapshot = null;   // クロップタブに入った時点の枠(キャンセルで復元)
+let exifSnapshot = null;   // EXIFタブに入った時点の設定(キャンセルで復元)
 
 /* ========================================================================
    ユーティリティ
@@ -208,8 +216,10 @@ function onImageReady() {
   resetExifSettings();
   buildExifFieldChips();
 
+  state.cropFrame = { x: 0, y: 0, w: state.originalBase.width, h: state.originalBase.height };
+  state.crop.aspect = 'free';
+  syncAspectChipUI();
   setMode('crop');
-  resetCropToAspect('free');
   preloadFaceModel();
 }
 
@@ -220,15 +230,35 @@ function cloneCanvas(src) {
   return c;
 }
 
+/* ---------- 写真を閉じて別の写真を選び直す ---------- */
+els.btnClosePhoto.addEventListener('click', () => {
+  if (!state.originalBase) return;
+  if (!confirm('編集内容は保存されません。別の写真を選び直しますか？')) return;
+  goToPicker();
+});
+
+function goToPicker() {
+  state.originalBase = null;
+  state.workingBase = null;
+  state.exifData = null;
+  state.appliedCropRect = null;
+  state.hideRegions = [];
+  cropSnapshot = null;
+  exifSnapshot = null;
+  els.fileInput.value = '';
+  els.cameraInput.value = '';
+  els.btnSave.disabled = true;
+  els.filename.textContent = '写真を選択してください';
+  els.editorScreen.hidden = true;
+  els.pickerScreen.hidden = false;
+}
+
 /* ========================================================================
    2. モード切替(トリミング / EXIF / 隠す)
    ======================================================================== */
 $$('.tab-btn').forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
 
 function setMode(mode) {
-  // トリミング編集中に他タブへ移動する場合は破棄してキャンセル扱い
-  if (state.mode === 'crop' && mode !== 'crop') cancelCropEdit();
-
   state.mode = mode;
   $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   Object.entries(els.panels).forEach(([k, el]) => el.hidden = k !== mode);
@@ -239,8 +269,14 @@ function setMode(mode) {
 
   if (mode === 'crop') {
     els.canvasHint.hidden = false;
-    els.canvasHint.textContent = '指で移動・ピンチで拡大縮小できます';
-    renderCropPreview();
+    els.canvasHint.textContent = '枠をドラッグして移動、ハンドルでサイズを変更できます';
+    // クロップタブに入った時点の枠を記憶しておく(「キャンセル」で復元するため)
+    cropSnapshot = { ...state.cropFrame };
+    renderCropStage();
+  } else if (mode === 'exif') {
+    // EXIFタブに入った時点の設定を記憶しておく(「キャンセル」で復元するため)
+    exifSnapshot = JSON.parse(JSON.stringify(state.exif));
+    renderFinal();
   } else {
     renderFinal();
     if (mode === 'hide') syncHideOverlay();
@@ -248,136 +284,179 @@ function setMode(mode) {
 }
 
 /* ========================================================================
-   3. トリミング
+   3. トリミング(枠をドラッグ/ハンドルで指定する方式)
    ======================================================================== */
-function resetCropToAspect(aspectKey) {
+function aspectRatioValue(aspectKey, base) {
+  if (aspectKey === '1:1') return 1;
+  if (aspectKey === '4:3') return 4 / 3;
+  if (aspectKey === '3:4') return 3 / 4;
+  if (aspectKey === '16:9') return 16 / 9;
+  if (aspectKey === '9:16') return 9 / 16;
+  if (aspectKey === 'orig') return base.width / base.height;
+  return null; // free
+}
+
+function resetCropFrameToAspect(aspectKey) {
   const base = state.originalBase;
   state.crop.aspect = aspectKey;
-
-  let ratio = null;
-  if (aspectKey === '1:1') ratio = 1;
-  else if (aspectKey === '4:3') ratio = 4 / 3;
-  else if (aspectKey === '3:4') ratio = 3 / 4;
-  else if (aspectKey === '16:9') ratio = 16 / 9;
-  else if (aspectKey === '9:16') ratio = 9 / 16;
-  else if (aspectKey === 'orig') ratio = base.width / base.height;
-  // 'free' -> ratio = null (画像全体をそのまま使う)
+  const ratio = aspectRatioValue(aspectKey, base);
 
   let w, h;
   if (ratio === null) { w = base.width; h = base.height; }
   else if (base.width / base.height > ratio) { h = base.height; w = h * ratio; }
   else { w = base.width; h = w / ratio; }
 
-  state.crop.srcW = w;
-  state.crop.srcH = h;
-  state.crop.srcX = (base.width - w) / 2;
-  state.crop.srcY = (base.height - h) / 2;
+  state.cropFrame = { x: (base.width - w) / 2, y: (base.height - h) / 2, w, h };
+  syncAspectChipUI();
+  syncCropFrameGeometry();
+}
 
-  $$('#panel-crop .chip').forEach(c => c.classList.toggle('active', c.dataset.aspect === aspectKey));
-  renderCropPreview();
+function syncAspectChipUI() {
+  $$('#panel-crop .chip').forEach(c => c.classList.toggle('active', c.dataset.aspect === state.crop.aspect));
 }
 
 $$('#panel-crop .chip').forEach(chip => {
-  chip.addEventListener('click', () => resetCropToAspect(chip.dataset.aspect));
+  chip.addEventListener('click', () => resetCropFrameToAspect(chip.dataset.aspect));
 });
 
-function renderCropPreview() {
-  const { srcX, srcY, srcW, srcH } = state.crop;
-  const targetW = 900, targetH = Math.round(900 * (srcH / srcW));
-  els.canvas.width = targetW;
-  els.canvas.height = Math.max(1, targetH);
+function renderCropStage() {
+  // クロップモードでは常に写真全体を表示し、その上に枠を重ねて範囲を指定する
+  const base = state.originalBase;
+  els.canvas.width = base.width;
+  els.canvas.height = base.height;
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(state.originalBase, srcX, srcY, srcW, srcH, 0, 0, els.canvas.width, els.canvas.height);
-  els.cropFrame.style.left = '4%';
-  els.cropFrame.style.top = '4%';
-  els.cropFrame.style.right = '4%';
-  els.cropFrame.style.bottom = '4%';
+  ctx.drawImage(base, 0, 0);
+  syncCropFrameGeometry();
 }
 
-/* --- パン(ドラッグ)/ ピンチズーム --- */
-let pointers = new Map();
-let pinchStartDist = 0, pinchStartRect = null;
-
-els.canvasWrap.addEventListener('pointerdown', e => {
-  if (state.mode !== 'crop') return;
-  els.canvasWrap.setPointerCapture(e.pointerId);
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (pointers.size === 2) {
-    const [a, b] = [...pointers.values()];
-    pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
-    pinchStartRect = { ...state.crop };
-  }
-});
-els.canvasWrap.addEventListener('pointermove', e => {
-  if (state.mode !== 'crop' || !pointers.has(e.pointerId)) return;
-  const prev = pointers.get(e.pointerId);
-  const cur = { x: e.clientX, y: e.clientY };
-  pointers.set(e.pointerId, cur);
-
-  if (pointers.size === 1) {
+function syncCropFrameGeometry() {
+  requestAnimationFrame(() => {
+    if (state.mode !== 'crop') return;
     const rect = els.canvas.getBoundingClientRect();
-    const scale = state.crop.srcW / rect.width;
-    const dxImg = (cur.x - prev.x) * scale;
-    const dyImg = (cur.y - prev.y) * scale;
-    panCrop(-dxImg, -dyImg);
-  } else if (pointers.size === 2) {
-    const [a, b] = [...pointers.values()];
-    const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
-    const factor = dist / pinchStartDist;
-    zoomCrop(pinchStartRect, factor);
+    const wrapRect = els.canvasWrap.getBoundingClientRect();
+    const base = state.originalBase;
+    const scaleX = rect.width / base.width, scaleY = rect.height / base.height;
+    const f = state.cropFrame;
+    Object.assign(els.cropFrame.style, {
+      left:   `${(rect.left - wrapRect.left) + f.x * scaleX}px`,
+      top:    `${(rect.top - wrapRect.top) + f.y * scaleY}px`,
+      width:  `${f.w * scaleX}px`,
+      height: `${f.h * scaleY}px`,
+    });
+    // アスペクト比が固定されている間は、辺の中央ハンドルは比率を崩すため隠す
+    const locked = state.crop.aspect !== 'free';
+    $$('.crop-handle', els.cropFrame).forEach(h => {
+      h.classList.toggle('hidden-handle', locked && !h.classList.contains('corner'));
+    });
+  });
+}
+window.addEventListener('resize', () => { if (state.mode === 'crop') syncCropFrameGeometry(); });
+
+/* --- 枠のドラッグ移動 / ハンドルでのリサイズ --- */
+const MIN_CROP_SIZE = 60; // 画像ピクセル基準の最小サイズ
+let cropDrag = null; // { type:'move'|'resize', handle, startX, startY, startFrame }
+
+els.cropFrame.addEventListener('pointerdown', e => {
+  if (state.mode !== 'crop') return;
+  e.preventDefault();
+  const handleEl = e.target.closest('.crop-handle');
+  cropDrag = {
+    type: handleEl ? 'resize' : 'move',
+    handle: handleEl ? handleEl.dataset.handle : null,
+    startX: e.clientX,
+    startY: e.clientY,
+    startFrame: { ...state.cropFrame },
+  };
+});
+
+window.addEventListener('pointermove', e => {
+  if (!cropDrag || state.mode !== 'crop') return;
+  const rect = els.canvas.getBoundingClientRect();
+  const base = state.originalBase;
+  const scaleX = base.width / rect.width, scaleY = base.height / rect.height;
+  const dx = (e.clientX - cropDrag.startX) * scaleX;
+  const dy = (e.clientY - cropDrag.startY) * scaleY;
+
+  if (cropDrag.type === 'move') {
+    moveCropFrame(cropDrag.startFrame, dx, dy);
+  } else {
+    resizeCropFrame(cropDrag.startFrame, cropDrag.handle, dx, dy);
   }
 });
-function endPointer(e) { pointers.delete(e.pointerId); }
-els.canvasWrap.addEventListener('pointerup', endPointer);
-els.canvasWrap.addEventListener('pointercancel', endPointer);
-els.canvasWrap.addEventListener('pointerleave', endPointer);
+window.addEventListener('pointerup', () => { cropDrag = null; });
+window.addEventListener('pointercancel', () => { cropDrag = null; });
 
-function panCrop(dx, dy) {
+function moveCropFrame(startFrame, dx, dy) {
   const base = state.originalBase;
-  state.crop.srcX = clamp(state.crop.srcX + dx, 0, base.width - state.crop.srcW);
-  state.crop.srcY = clamp(state.crop.srcY + dy, 0, base.height - state.crop.srcH);
-  renderCropPreview();
+  state.cropFrame.x = clamp(startFrame.x + dx, 0, Math.max(0, base.width - startFrame.w));
+  state.cropFrame.y = clamp(startFrame.y + dy, 0, Math.max(0, base.height - startFrame.h));
+  syncCropFrameGeometry();
 }
 
-function zoomCrop(startRect, factor) {
+function resizeCropFrame(startFrame, handle, dx, dy) {
   const base = state.originalBase;
-  const cx = startRect.srcX + startRect.srcW / 2;
-  const cy = startRect.srcY + startRect.srcH / 2;
-  const minW = 40, maxW = base.width;
-  let w = clamp(startRect.srcW / factor, minW, maxW);
-  let h = w * (startRect.srcH / startRect.srcW);
-  if (h > base.height) { h = base.height; w = h * (startRect.srcW / startRect.srcH); }
+  const ratio = aspectRatioValue(state.crop.aspect, base); // null = 自由
+  let { x, y, w, h } = startFrame;
+  const x0 = startFrame.x, y0 = startFrame.y, w0 = startFrame.w, h0 = startFrame.h;
 
-  state.crop.srcW = w; state.crop.srcH = h;
-  state.crop.srcX = clamp(cx - w / 2, 0, base.width - w);
-  state.crop.srcY = clamp(cy - h / 2, 0, base.height - h);
-  renderCropPreview();
+  if (handle === 'e') { w = w0 + dx; }
+  else if (handle === 'w') { x = x0 + dx; w = w0 - dx; }
+  else if (handle === 's') { h = h0 + dy; }
+  else if (handle === 'n') { y = y0 + dy; h = h0 - dy; }
+  else if (handle === 'se') { w = w0 + dx; h = ratio ? w / ratio : h0 + dy; }
+  else if (handle === 'nw') { w = w0 - dx; h = ratio ? w / ratio : h0 - dy; x = x0 + w0 - w; y = y0 + h0 - h; }
+  else if (handle === 'ne') { w = w0 + dx; h = ratio ? w / ratio : h0 - dy; y = y0 + h0 - h; }
+  else if (handle === 'sw') { w = w0 - dx; h = ratio ? w / ratio : h0 + dy; x = x0 + w0 - w; }
+
+  // 最小サイズを確保
+  if (w < MIN_CROP_SIZE) {
+    if (['nw', 'w', 'sw'].includes(handle)) x -= (MIN_CROP_SIZE - w);
+    w = MIN_CROP_SIZE;
+    if (ratio && ['se', 'nw', 'ne', 'sw'].includes(handle)) h = w / ratio;
+  }
+  if (h < MIN_CROP_SIZE) {
+    if (['n', 'nw', 'ne'].includes(handle)) y -= (MIN_CROP_SIZE - h);
+    h = MIN_CROP_SIZE;
+    if (ratio && ['se', 'nw', 'ne', 'sw'].includes(handle)) w = h * ratio;
+  }
+  // 画像範囲内にクランプ
+  if (x < 0) { w += x; x = 0; }
+  if (y < 0) { h += y; y = 0; }
+  if (x + w > base.width) w = base.width - x;
+  if (y + h > base.height) h = base.height - y;
+
+  state.cropFrame = { x, y, w: Math.max(MIN_CROP_SIZE, w), h: Math.max(MIN_CROP_SIZE, h) };
+  // 手動リサイズで規定の比率と合わなくなったら「自由」扱いに切り替える
+  if (!ratio) { state.crop.aspect = 'free'; syncAspectChipUI(); }
+  syncCropFrameGeometry();
 }
 
 els.cropApply.addEventListener('click', () => {
-  const { srcX, srcY, srcW, srcH } = state.crop;
+  const { x, y, w, h } = state.cropFrame;
   const c = document.createElement('canvas');
-  c.width = Math.round(srcW);
-  c.height = Math.round(srcH);
-  c.getContext('2d').drawImage(state.originalBase, srcX, srcY, srcW, srcH, 0, 0, c.width, c.height);
+  c.width = Math.round(w);
+  c.height = Math.round(h);
+  c.getContext('2d').drawImage(state.originalBase, x, y, w, h, 0, 0, c.width, c.height);
   state.workingBase = c;
-  state.appliedCropRect = { srcX, srcY, srcW, srcH };
+  state.appliedCropRect = { x, y, w, h, aspect: state.crop.aspect };
+  cropSnapshot = { x, y, w, h };
   // クロップ確定でクロップ後座標系が変わるため、隠す領域はリセット(検出しなおし)
   state.hideRegions = [];
   toast('トリミングを適用しました');
   setMode('exif');
 });
 
-els.cropCancel.addEventListener('click', () => { cancelCropEdit(); setMode(state.appliedCropRect ? 'exif' : 'crop'); });
-
-function cancelCropEdit() {
-  if (state.appliedCropRect) {
-    const r = state.appliedCropRect;
-    state.crop.srcX = r.srcX; state.crop.srcY = r.srcY; state.crop.srcW = r.srcW; state.crop.srcH = r.srcH;
+els.cropCancel.addEventListener('click', () => {
+  if (cropSnapshot) {
+    state.cropFrame = { ...cropSnapshot };
+    state.crop.aspect = state.appliedCropRect ? state.appliedCropRect.aspect : 'free';
   } else {
-    resetCropToAspect('free');
+    resetCropFrameToAspect('free');
   }
-}
+  syncAspectChipUI();
+  syncCropFrameGeometry();
+  toast('トリミングの変更をキャンセルしました');
+});
 
 /* ========================================================================
    4. EXIF 焼き込み
@@ -489,6 +568,32 @@ els.exifOutline.addEventListener('click', e => {
   $$('button', els.exifOutline).forEach(b => b.classList.toggle('active', b === btn));
   renderFinal();
 });
+
+els.exifApply.addEventListener('click', () => {
+  exifSnapshot = JSON.parse(JSON.stringify(state.exif));
+  toast('EXIF設定を適用しました');
+  setMode('hide');
+});
+
+els.exifCancel.addEventListener('click', () => {
+  if (exifSnapshot) state.exif = JSON.parse(JSON.stringify(exifSnapshot));
+  syncExifControlsFromState();
+  renderFinal();
+  toast('EXIFの変更をキャンセルしました');
+});
+
+function syncExifControlsFromState() {
+  // state.exif の内容(キャンセルで復元された値など)をUIへ反映しなおす
+  $$('#exif-fields .toggle-chip').forEach((chip, i) => {
+    const def = EXIF_FIELD_DEFS[i];
+    if (def) chip.classList.toggle('active', !!state.exif.fields[def.key] && availableExifValue(def) !== null);
+  });
+  $$('button', els.exifPos).forEach(b => b.classList.toggle('active', b.dataset.pos === state.exif.position));
+  els.exifSize.value = state.exif.size;
+  $$('button', els.exifColor).forEach(b => b.classList.toggle('active', b.dataset.color === state.exif.colorPreset));
+  els.exifColorCustom.value = state.exif.color;
+  $$('button', els.exifOutline).forEach(b => b.classList.toggle('active', b.dataset.outline === state.exif.outline));
+}
 
 function buildExifLines() {
   const lines = [];
@@ -603,15 +708,24 @@ async function runAutoDetect() {
 }
 
 function makeRegion(x, y, w, h, type, source) {
-  return { id: regionSeq++, x, y, w, h, type, source, method: state.hideMethod, enabled: true };
+  return { id: regionSeq++, x, y, w, h, type, source, method: state.hideMethod, icon: state.hideIcon, enabled: true };
 }
 
 els.hideMethod.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   state.hideMethod = btn.dataset.method;
   $$('button', els.hideMethod).forEach(b => b.classList.toggle('active', b === btn));
+  els.hideIconRow.hidden = state.hideMethod !== 'icon';
   // 既に検出/追加済みの範囲にも新しい隠し方を反映する
-  state.hideRegions.forEach(r => { r.method = state.hideMethod; });
+  state.hideRegions.forEach(r => { r.method = state.hideMethod; r.icon = state.hideIcon; });
+  renderFinal();
+});
+
+els.hideIconChoice.addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  state.hideIcon = btn.dataset.icon;
+  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('active', b === btn));
+  state.hideRegions.forEach(r => { r.icon = state.hideIcon; });
   renderFinal();
 });
 
@@ -740,7 +854,7 @@ function applyHideRegions(targetCtx, sourceCanvas) {
     const w = clamp(r.w, 1, sourceCanvas.width - x);
     const h = clamp(r.h, 1, sourceCanvas.height - y);
     if (r.method === 'mosaic') drawMosaic(targetCtx, sourceCanvas, x, y, w, h);
-    else drawIcon(targetCtx, x, y, w, h);
+    else drawIcon(targetCtx, x, y, w, h, r.icon);
   });
 }
 
@@ -758,7 +872,7 @@ function drawMosaic(targetCtx, sourceCanvas, x, y, w, h) {
   targetCtx.restore();
 }
 
-function drawIcon(targetCtx, x, y, w, h) {
+function drawIcon(targetCtx, x, y, w, h, iconChar) {
   targetCtx.save();
   targetCtx.fillStyle = '#1a1d21';
   roundRect(targetCtx, x, y, w, h, Math.min(w, h) * 0.15);
@@ -766,7 +880,7 @@ function drawIcon(targetCtx, x, y, w, h) {
   targetCtx.font = `${Math.min(w, h) * 0.75}px sans-serif`;
   targetCtx.textAlign = 'center';
   targetCtx.textBaseline = 'middle';
-  targetCtx.fillText('🕶️', x + w / 2, y + h / 2 + h * 0.03);
+  targetCtx.fillText(iconChar || state.hideIcon, x + w / 2, y + h / 2 + h * 0.03);
   targetCtx.restore();
 }
 function roundRect(c, x, y, w, h, r) {
@@ -814,10 +928,15 @@ els.btnReset.addEventListener('click', () => {
   state.appliedCropRect = null;
   state.workingBase = cloneCanvas(state.originalBase);
   state.hideRegions = [];
+  state.hideMethod = 'mosaic';
+  state.hideIcon = '🕶️';
+  $$('button', els.hideMethod).forEach(b => b.classList.toggle('active', b.dataset.method === 'mosaic'));
+  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('active', b.dataset.icon === '🕶️'));
+  els.hideIconRow.hidden = true;
   resetExifSettings();
   buildExifFieldChips();
+  resetCropFrameToAspect('free');
   setMode('crop');
-  resetCropToAspect('free');
   toast('リセットしました');
 });
 
