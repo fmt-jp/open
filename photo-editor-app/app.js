@@ -5,6 +5,23 @@
 
 const MAX_EDIT_DIM = 1600;      // 編集・保存に使う長辺の最大ピクセル数(端末負荷対策)
 const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+const EXIFJS_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js';
+const FACEAPI_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+
+// 外部ライブラリの遅延読み込み(起動時は読み込まず、実際に使う時だけ取得する)
+const _scriptCache = {};
+function loadScriptOnce(src, timeoutMs = 10000) {
+  if (_scriptCache[src]) return _scriptCache[src];
+  _scriptCache[src] = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('script load timeout: ' + src)), timeoutMs);
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => { clearTimeout(timer); resolve(); };
+    s.onerror = () => { clearTimeout(timer); reject(new Error('script load failed: ' + src)); };
+    document.head.appendChild(s);
+  });
+  return _scriptCache[src];
+}
 
 const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -98,21 +115,55 @@ function handleFile(file) {
   els.filename.textContent = file.name;
   showLoading('写真を読み込んでいます…');
 
-  // EXIF は元ファイル(File)から読む。ネットワーク送信は行わない。
-  EXIF.getData(file, function () {
-    state.exifData = this.exifdata || null;
+  let settled = false;
+  // EXIF解析が固まった/失敗した場合でも永久に「読み込み中」のままにならないための保険
+  const failSafeTimer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    hideLoading();
+    toast('読み込みに時間がかかっています。別の写真(JPEG/PNGなど)でお試しください');
+  }, 8000);
 
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      buildOriginalBase(img, state.exifData);
-      URL.revokeObjectURL(url);
-      onImageReady();
-      hideLoading();
-    };
-    img.onerror = () => { hideLoading(); toast('この画像は読み込めませんでした'); };
-    img.src = url;
-  });
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  const finish = exifData => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(failSafeTimer);
+    URL.revokeObjectURL(url);
+    state.exifData = exifData;
+    buildOriginalBase(img, exifData);
+    onImageReady();
+    hideLoading();
+  };
+
+  img.onload = () => {
+    // 写真の表示はEXIF読み取りの成否に左右させない(HEIC等でEXIF解析が失敗/停止しても写真は表示する)
+    loadScriptOnce(EXIFJS_URL)
+      .then(() => {
+        patchExifTags();
+        try {
+          EXIF.getData(file, function () { finish(this.exifdata || null); });
+        } catch (err) {
+          console.warn('EXIF読み取りに失敗しました(写真の表示は続行します)', err);
+          finish(null);
+        }
+      })
+      .catch(err => {
+        console.warn('EXIFライブラリを読み込めませんでした(写真の表示は続行します)', err);
+        finish(null);
+      });
+  };
+  img.onerror = () => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(failSafeTimer);
+    URL.revokeObjectURL(url);
+    hideLoading();
+    toast('この画像は読み込めませんでした(HEIC形式の場合はJPEG/PNGへの変換をお試しください)');
+  };
+  img.src = url;
 }
 
 function buildOriginalBase(img, exifData) {
@@ -343,6 +394,19 @@ const EXIF_FIELD_DEFS = [
   { key: 'gps',      label: 'GPS情報', get: d => formatGps(d), defaultOn: false },
 ];
 
+// exif-js 2.3.0 は EXIF 2.3 で追加されたレンズ関連タグを認識しないため、読み込み後に補完する
+function patchExifTags() {
+  if (!window.EXIF || !EXIF.Tags || EXIF.Tags[0xA434]) return;
+  Object.assign(EXIF.Tags, {
+    0xA430: 'CameraOwnerName',
+    0xA431: 'BodySerialNumber',
+    0xA432: 'LensSpecification',
+    0xA433: 'LensMake',
+    0xA434: 'LensModel',
+    0xA435: 'LensSerialNumber',
+  });
+}
+
 function toNum(v) { return typeof v === 'object' && v.numerator != null ? v.numerator / v.denominator : v; }
 function formatExifDate(v) {
   if (!v) return null;
@@ -488,8 +552,10 @@ function drawExifText(targetCtx, w, h) {
    5. 顔・ナンバープレートを隠す
    ======================================================================== */
 async function preloadFaceModel() {
-  if (state.faceModelReady || !window.faceapi) return;
+  if (state.faceModelReady) return;
   try {
+    await loadScriptOnce(FACEAPI_URL);
+    if (!window.faceapi) throw new Error('face-api.js の読み込みに失敗しました');
     await faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL);
     state.faceModelReady = true;
   } catch (e) {
@@ -544,6 +610,9 @@ els.hideMethod.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   state.hideMethod = btn.dataset.method;
   $$('button', els.hideMethod).forEach(b => b.classList.toggle('active', b === btn));
+  // 既に検出/追加済みの範囲にも新しい隠し方を反映する
+  state.hideRegions.forEach(r => { r.method = state.hideMethod; });
+  renderFinal();
 });
 
 /* --- 手動追加(ドラッグして範囲指定) --- */
@@ -775,6 +844,10 @@ els.btnSave.addEventListener('click', () => {
     toast('保存しました(端末のダウンロード/写真に追加されます)');
   }, 'image/jpeg', 0.92);
 });
+
+/* ---------- 想定外エラーへの保険: ローディング表示が固まったままにならないようにする ---------- */
+window.addEventListener('error', e => { console.error(e.error || e.message); hideLoading(); });
+window.addEventListener('unhandledrejection', e => { console.error(e.reason); hideLoading(); });
 
 /* ---------- PWA: Service Worker(任意・オフライン対応) ---------- */
 if ('serviceWorker' in navigator) {

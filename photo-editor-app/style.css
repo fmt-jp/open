@@ -15,6 +15,7 @@
 }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+[hidden]{ display:none !important; } /* IDセレクタ等のdisplay指定より必ず優先させる */
 html,body{ height:100%; margin:0; overscroll-behavior:none; }
 body{
   background:var(--bg);
