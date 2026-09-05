@@ -671,9 +671,11 @@
     renderSlotList();
     el.slotModalConfirm.disabled = true;
     el.slotModal.hidden = false;
+    el.slotModal.style.display = "flex";
   }
   function closeSlotModal(){
     el.slotModal.hidden = true;
+    el.slotModal.style.display = "none";
     slotModalMode = null;
     slotModalSelected = null;
   }

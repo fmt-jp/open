@@ -36,6 +36,12 @@
 
 *{ box-sizing: border-box; }
 
+/* hidden属性は、他のクラスで display を指定していても必ず優先されるようにする
+   （[hidden] とクラスの display 指定が競合すると、ブラウザによっては
+   非表示にならないことがあるための対策） */
+[hidden]{ display: none !important; }
+
+
 html,body{
   margin:0;
   padding:0;
