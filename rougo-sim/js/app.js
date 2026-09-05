@@ -7,6 +7,8 @@
   "use strict";
 
   const STORAGE_KEY = "rougo-sim-state-v1";
+  const SLOT_PREFIX = "rougo-sim-slot-";
+  const NUM_SLOTS = 5;
 
   /* ---------------------------------------------------------------------
      初期状態
@@ -83,7 +85,14 @@
     detailTableBody: document.getElementById("detail-table-body"),
     chartCanvas: document.getElementById("assetChart"),
 
-    tplItemRow: document.getElementById("tpl-item-row")
+    tplItemRow: document.getElementById("tpl-item-row"),
+
+    slotModal: document.getElementById("slot-modal"),
+    slotModalTitle: document.getElementById("slot-modal-title"),
+    slotModalNote: document.getElementById("slot-modal-note"),
+    slotList: document.getElementById("slot-list"),
+    slotModalCancel: document.getElementById("slot-modal-cancel"),
+    slotModalConfirm: document.getElementById("slot-modal-confirm")
   };
 
   /* ---------------------------------------------------------------------
@@ -615,33 +624,136 @@
   }
 
   /* ---------------------------------------------------------------------
-     データ保存（LocalStorage）
+     データ保存（LocalStorage・5枠までの保存スロット）
      --------------------------------------------------------------------- */
-  function saveToStorage(){
+  function getSlot(n){
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      flashStatus("保存しました。");
+      const raw = localStorage.getItem(SLOT_PREFIX + n);
+      if (!raw) return null;
+      return JSON.parse(raw);
     } catch (e){
-      flashStatus("保存できませんでした。ブラウザの設定をご確認ください。");
+      return null;
     }
   }
-  function loadFromStorage(){
+  function setSlot(n, slotData){
+    localStorage.setItem(SLOT_PREFIX + n, JSON.stringify(slotData));
+  }
+  function formatSavedAt(iso){
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw){
-        flashStatus("保存されたデータが見つかりませんでした。");
-        return;
+      const d = new Date(iso);
+      return d.toLocaleString("ja-JP", {
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit"
+      });
+    } catch (e){
+      return "";
+    }
+  }
+  function slotSummary(slotData){
+    if (!slotData || !slotData.state) return "";
+    const b = slotData.state.basic || {};
+    const parts = [];
+    if (isFiniteNum(b.currentAge)) parts.push(`現在${b.currentAge}歳`);
+    if (isFiniteNum(b.currentAssets)) parts.push(`資産${b.currentAssets.toLocaleString("ja-JP")}万円`);
+    return parts.join("／");
+  }
+
+  let slotModalMode = null; // "save" | "load"
+  let slotModalSelected = null;
+
+  function openSlotModal(mode){
+    slotModalMode = mode;
+    slotModalSelected = null;
+    el.slotModalTitle.textContent = mode === "save" ? "保存先を選択" : "読み込むデータを選択";
+    el.slotModalNote.textContent = mode === "save"
+      ? "保存する枠を選んでください。既にデータがある枠を選ぶと上書きされます。"
+      : "読み込む枠を選んでください。現在の入力内容は読み込んだ内容で置き換わります。";
+    renderSlotList();
+    el.slotModalConfirm.disabled = true;
+    el.slotModal.hidden = false;
+  }
+  function closeSlotModal(){
+    el.slotModal.hidden = true;
+    slotModalMode = null;
+    slotModalSelected = null;
+  }
+
+  function renderSlotList(){
+    el.slotList.innerHTML = "";
+    for (let n = 1; n <= NUM_SLOTS; n++){
+      const slotData = getSlot(n);
+      const isEmpty = !slotData;
+      const disabledForLoad = slotModalMode === "load" && isEmpty;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "slot-item" + (isEmpty ? " is-empty" : "") + (disabledForLoad ? " is-disabled" : "");
+      btn.disabled = disabledForLoad;
+      btn.dataset.slot = String(n);
+
+      const title = isEmpty ? "空き" : `保存日時：${formatSavedAt(slotData.savedAt)}`;
+      const meta = isEmpty ? "まだデータがありません" : (slotSummary(slotData) || "");
+
+      btn.innerHTML = `
+        <span class="slot-badge">${n}</span>
+        <span class="slot-info">
+          <span class="slot-title">スロット${n}　${escapeHtml(title)}</span>
+          <span class="slot-meta">${escapeHtml(meta)}</span>
+        </span>
+        <span class="slot-check" aria-hidden="true"></span>
+      `;
+
+      btn.addEventListener("click", () => {
+        if (btn.disabled) return;
+        slotModalSelected = n;
+        Array.from(el.slotList.children).forEach(c => c.classList.remove("is-selected"));
+        btn.classList.add("is-selected");
+        el.slotModalConfirm.disabled = false;
+      });
+
+      el.slotList.appendChild(btn);
+    }
+  }
+
+  function confirmSlotModal(){
+    if (!slotModalSelected) return;
+    const n = slotModalSelected;
+
+    if (slotModalMode === "save"){
+      const existing = getSlot(n);
+      if (existing){
+        const ok = window.confirm(`スロット${n}には既にデータがあります。上書きしてよろしいですか？`);
+        if (!ok) return;
       }
-      const parsed = JSON.parse(raw);
-      state = parsed;
-      fillBasicFields();
-      renderItemList("income");
-      renderItemList("expense");
-      flashStatus("読み込みました。");
-    } catch (e){
-      flashStatus("読み込みに失敗しました。");
+      try {
+        setSlot(n, { savedAt: new Date().toISOString(), state: state });
+        flashStatus(`スロット${n}に保存しました。`);
+        closeSlotModal();
+      } catch (e){
+        flashStatus("保存できませんでした。ブラウザの設定をご確認ください。");
+      }
+      return;
+    }
+
+    if (slotModalMode === "load"){
+      const slotData = getSlot(n);
+      if (!slotData) return;
+      const ok = window.confirm(`スロット${n}のデータを読み込みます。現在の入力内容は上書きされます。よろしいですか？`);
+      if (!ok) return;
+      try {
+        state = slotData.state;
+        fillBasicFields();
+        renderItemList("income");
+        renderItemList("expense");
+        flashStatus(`スロット${n}を読み込みました。`);
+        closeSlotModal();
+      } catch (e){
+        flashStatus("読み込みに失敗しました。");
+      }
+      return;
     }
   }
+
   function resetToDefault(){
     state = defaultState();
     fillBasicFields();
@@ -687,8 +799,16 @@
 
     el.btnCalculate.addEventListener("click", attemptCalculate);
 
-    el.btnSave.addEventListener("click", () => { saveToStorage(); });
-    el.btnLoad.addEventListener("click", () => { loadFromStorage(); });
+    el.btnSave.addEventListener("click", () => { openSlotModal("save"); });
+    el.btnLoad.addEventListener("click", () => { openSlotModal("load"); });
+    el.slotModalCancel.addEventListener("click", closeSlotModal);
+    el.slotModalConfirm.addEventListener("click", confirmSlotModal);
+    el.slotModal.addEventListener("click", (e) => {
+      if (e.target === el.slotModal) closeSlotModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !el.slotModal.hidden) closeSlotModal();
+    });
     el.btnReset.addEventListener("click", () => {
       if (window.confirm("入力内容を初期状態に戻します。よろしいですか？")){
         resetToDefault();

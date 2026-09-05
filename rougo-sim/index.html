@@ -98,10 +98,11 @@
       </details>
 
       <div class="data-actions">
-        <button type="button" class="btn-ghost" id="btn-save">データを保存</button>
-        <button type="button" class="btn-ghost" id="btn-load">データを読み込む</button>
+        <button type="button" class="btn-ghost" id="btn-save">データを保存…</button>
+        <button type="button" class="btn-ghost" id="btn-load">データを読み込む…</button>
         <button type="button" class="btn-ghost btn-ghost-danger" id="btn-reset">初期状態に戻す</button>
       </div>
+      <p class="hint" style="margin-top:-8px; margin-bottom:14px;">保存データは5つまで保存でき、保存先（枠）を選んで上書き・読み込みができます。</p>
 
       <div id="global-errors" class="global-errors" hidden aria-live="polite"></div>
       <button type="button" class="btn-primary btn-calc" id="btn-calculate">この内容で試算する</button>
@@ -147,6 +148,19 @@
   <footer class="app-footer">
     <p>この試算は、入力内容にもとづく概算です。将来の物価・運用成果・年金額などを保証するものではありません。実際の資金計画については、専門家にもご相談ください。</p>
   </footer>
+</div>
+
+<!-- ===== 保存枠 選択モーダル ===== -->
+<div id="slot-modal" class="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="slot-modal-title">
+    <h3 id="slot-modal-title">保存先を選択</h3>
+    <p class="modal-note" id="slot-modal-note"></p>
+    <div id="slot-list" class="slot-list"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" id="slot-modal-cancel">キャンセル</button>
+      <button type="button" class="btn-primary" id="slot-modal-confirm" disabled>決定</button>
+    </div>
+  </div>
 </div>
 
 <!-- テンプレート（収入・支出の行） -->

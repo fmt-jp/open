@@ -472,6 +472,108 @@ select.f-period{
   line-height: 1.7;
 }
 
+/* ---------- 保存枠 選択モーダル ---------- */
+.modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(32,43,35,0.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 20px;
+  z-index: 100;
+}
+.modal{
+  background: var(--surface);
+  border-radius: var(--radius-l);
+  padding: 22px 20px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 86vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px -12px rgba(0,0,0,0.35);
+}
+.modal h3{
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--accent-dark);
+  margin: 0 0 6px;
+}
+.modal-note{
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+.slot-list{ display:flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.slot-item{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 12px 14px;
+  background: var(--surface-sunken);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color .15s ease, background .15s ease;
+}
+.slot-item:hover{ border-color: var(--line-strong); }
+.slot-item.is-selected{
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.slot-item.is-disabled{
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.slot-item .slot-badge{
+  flex-shrink:0;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display:flex; align-items:center; justify-content:center;
+  font-family: var(--font-display);
+}
+.slot-item.is-empty .slot-badge{ background: var(--ink-faint); }
+.slot-item .slot-info{ flex: 1; min-width: 0; }
+.slot-item .slot-info .slot-title{
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.slot-item .slot-info .slot-meta{
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+.slot-item .slot-check{
+  flex-shrink:0;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+}
+.slot-item.is-selected .slot-check{
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 3px #fff;
+}
+.modal-actions{
+  display:flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.modal-actions .btn-primary{ width: auto; padding: 11px 20px; font-size: 14px; box-shadow: none; }
+.modal-actions .btn-primary:disabled{
+  background: var(--line-strong);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* ---------- レスポンシブ ---------- */
 @media (max-width: 620px){
   .grid-2{ grid-template-columns: 1fr; }
