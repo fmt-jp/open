@@ -1,6 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- 背景は角丸正方形いっぱいに(Androidが円形などにマスクしても隙間ができないよう edge-to-edge) -->
   <rect width="192" height="192" rx="36" fill="#14171a"/>
-  <g fill="none" stroke="#e8a33d" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+  <!-- 図柄は中央の安全円(直径 約62%)に収まるよう縮小して配置(丸型マスクで欠けないように) -->
+  <g transform="translate(96 96) scale(0.62) translate(-96 -96)"
+     fill="none" stroke="#e8a33d" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
     <rect x="24" y="38" width="120" height="92" rx="14"/>
     <circle cx="58" cy="66" r="10"/>
     <path d="M32 108 L68 78 L94 98 L120 72 L136 98"/>
