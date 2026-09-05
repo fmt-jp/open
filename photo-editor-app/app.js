@@ -4,9 +4,10 @@
    ========================================================================= */
 
 const MAX_EDIT_DIM = 1600;      // 編集・保存に使う長辺の最大ピクセル数(端末負荷対策)
-const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
-const EXIFJS_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js';
-const FACEAPI_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+// 外部CDNには依存せず、同一オリジンにファイルを同梱する(オフラインでも動作させるため)
+const FACE_MODEL_URL = './vendor/weights';
+const EXIFJS_URL  = './vendor/exif.js';
+const FACEAPI_URL = './vendor/face-api.min.js';
 
 // 外部ライブラリの遅延読み込み(起動時は読み込まず、実際に使う時だけ取得する)
 const _scriptCache = {};
@@ -973,12 +974,13 @@ els.btnSave.addEventListener('click', () => {
 window.addEventListener('error', e => { console.error(e.error || e.message); hideLoading(); });
 window.addEventListener('unhandledrejection', e => { console.error(e.reason); hideLoading(); });
 
-/* ---------- Service Worker: 過去の古いキャッシュが残っている端末のためだけに後始末する ----------
-   このアプリは今後 Service Worker によるキャッシュを使わない(キャッシュの固着で表示が更新
-   されない問題が繰り返し発生したため)。sw.js は自己解除するだけの内容にしてあり、
-   既に登録されてしまっている端末からは自動的に消える。新規訪問者には登録しない。 */
+/* ---------- Service Worker: オフラインでも動作するようにアプリ本体をキャッシュする ----------
+   起動時に一度だけ登録する。キャッシュ戦略は stale-while-revalidate(sw.js参照)で、
+   オンライン時は裏側で常に最新化されるため、キャッシュの固着は起きにくい。 */
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(reg => reg.unregister());
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('Service Workerの登録に失敗しました(オフライン機能のみ影響、通常利用は可能)', err);
+    });
   });
 }

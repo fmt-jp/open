@@ -10,9 +10,9 @@
 |---|---|---|
 | 実行環境 | HTML/CSS/JavaScript + PWA(Progressive Web App) | ネイティブのビルド環境(Xcode/Android Studio)なしで、iPhone/Androidどちらのブラウザでも即動作。ホーム画面に追加すればアイコンから起動できネイティブアプリに近い体験になる |
 | フレームワーク | 素のJavaScript(フレームワークなし) | Canvas APIを直接操作する処理が中心のため、フレームワークの抽象化がむしろ不要。依存を減らし軽量に保てる |
-| EXIF読取 | [exif-js](https://github.com/exif-js/exif-js)(CDN読込) | JPEGのEXIFタグをブラウザ内だけで解析できる定番ライブラリ |
+| EXIF読取 | [exif-js](https://github.com/exif-js/exif-js)(`vendor/`に同梱) | JPEGのEXIFタグをブラウザ内だけで解析できる定番ライブラリ。オフラインでも使えるよう外部CDNではなく同梱 |
 | 画像処理(クロップ/文字焼込/モザイク) | Canvas 2D API | ピクセル単位の合成・縮小拡大描画がすべて標準APIで完結し、外部通信が不要 |
-| 顔検出 | [face-api.js](https://github.com/justadudewhohacks/face-api.js)(tinyFaceDetector, CDN読込) | TensorFlow.jsベースでブラウザ内(WebGL)推論が可能。**写真そのものは送信されず**、初回のみ学習済みモデルの重みファイルをダウンロードする(通信内容は写真ではなくモデルデータ) |
+| 顔検出 | [face-api.js](https://github.com/justadudewhohacks/face-api.js)(tinyFaceDetector, `vendor/`に同梱) | TensorFlow.jsベースでブラウザ内(WebGL)推論が可能。**写真そのものは送信されない**。モデルの重みファイルも同梱し、オフラインで動作する |
 | ナンバープレート検出 | MVPでは手動指定のみ | 商用利用可・軽量なオープンモデルが少ないため。`hideRegions`にtype:'plate'を追加できる構造にしてあるので、将来カスタムモデルを`app.js`の検出処理に差し込むだけで対応可能 |
 | 端末内処理の担保 | `fetch`/`XHR`による画像送信コードなし | 写真の読込(`File`→`Image`→`Canvas`)から保存(`canvas.toBlob`→ダウンロード)まで、すべてブラウザのメモリ内で完結 |
 
@@ -24,7 +24,8 @@ photo-editor-app/
 ├── style.css     … モバイル最適化スタイル(下部固定メニュー、タップ領域46px以上など)
 ├── app.js        … アプリのロジック本体(下記「主要処理」参照)
 ├── manifest.json … PWAマニフェスト(ホーム画面追加用)
-├── sw.js         … 後始末用(過去にインストールされた古いキャッシュを解除するためだけの自己解除スクリプト)
+├── sw.js         … オフライン対応用Service Worker(stale-while-revalidateでキャッシュを自動更新)
+├── vendor/       … exif-js・face-api.js・顔検出モデルを同梱(外部CDN不要・オフラインでも動作)
 ├── icon.svg      … アプリアイコン
 └── README.md     … 本ファイル
 ```
@@ -78,10 +79,16 @@ python3 -m http.server 8080
 | リセット | 上部の戻るアイコン(↺)でダイアログ確認後、全編集が元画像に戻ることを確認 |
 | 保存 | 保存アイコンをタップし、加工済みJPEGがダウンロード(端末では「写真に保存」相当の動作)されることを確認 |
 | エラー処理 | EXIF情報のない写真を選び、「この写真にはEXIF情報が見つかりませんでした」と表示されクラッシュしないことを確認 |
-| オフライン | 開発者ツールのネットワークタブで通信ログを確認し、写真ファイルを外部へ送信するリクエストが存在しないことを確認(モデルDL以外は通信ゼロ) |
+| オフライン動作 | 一度オンラインで開いた後、機内モードにするかDevToolsのNetworkタブで「Offline」を選び再読み込みしても、写真選択〜クロップ〜EXIF〜隠す〜保存まで一通り動作することを確認 |
+| 通信の最小化 | 開発者ツールのネットワークタブで通信ログを確認し、写真ファイルを外部へ送信するリクエストが存在しないことを確認(exif-js/face-api.js/モデルは全て同梱ファイルから読み込まれ、外部CDNへの通信は発生しない) |
 
 ## 6. 今後の拡張方法
 
+- **⚠️ 保守上の注意(重要)**: `sw.js`の`ASSETS`に含まれるファイル(index.html/style.css/app.js等)
+  の中身を変更してデプロイする際は、`sw.js`内の`CACHE`の数字を必ず1つ上げてください
+  (例: `pixelveil-v1` → `pixelveil-v2`)。stale-while-revalidateにより多くの場合は自動で
+  最新化されますが、バージョンを上げることで古いキャッシュの削除とService Workerの
+  即時更新(`skipWaiting`/`clients.claim`)が確実に行われます。
 - **ナンバープレート自動検出**: `runAutoDetect()`と同じ形で、TensorFlow.js用の物体検出モデル
   (例: カスタム学習済みYOLO系のTFJS変換モデル)を読み込み、`makeRegion(x,y,w,h,'plate','auto')`
   で登録すれば自動化できます。
@@ -98,5 +105,5 @@ python3 -m http.server 8080
 
 - 写真ファイルは`File`→`Image`→`Canvas`の経路のみで処理し、`fetch`/`XHR`で外部へ送信するコードは
   存在しません。
-- 顔検出モデルの重みファイルのみ、初回にCDNからダウンロードします(写真データそのものは含まれません)。
+- 顔検出モデルの重みファイルも`vendor/`に同梱しており、外部への通信は発生しません。
 - GPS情報は個人の自宅・行動範囲の特定につながるため、EXIF焼き込みの初期状態を**OFF**にしています。

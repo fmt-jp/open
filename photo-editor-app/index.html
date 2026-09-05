@@ -182,8 +182,8 @@
   <div id="loading-overlay" hidden><div class="spinner"></div><div id="loading-text">読み込み中…</div></div>
 </div>
 
-<!-- exif-js / face-api.js は起動時には読み込まない(起動を重くしないため)。
-     app.js側で実際に必要になったタイミングで動的に読み込む。写真データ自体は一切送信しない。 -->
+<!-- exif-js / face-api.js は自前で同梱し(vendor/)、起動時には読み込まない(起動を重くしないため)。
+     オフラインでも動くよう、これらもService Workerでキャッシュ対象にしている。写真データ自体は一切送信しない。 -->
 <script src="app.js"></script>
 </body>
 </html>
