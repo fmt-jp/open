@@ -2,8 +2,12 @@
 // Theme
 // ---------------------------------------------------------------------------
 const THEME_KEY = "fx_tracker_theme";
+const THEME_BAR_COLORS = { ocean: "#0A1826", gold: "#17130D", silver: "#14171A" };
 function applyTheme(name) {
   document.documentElement.className = name === "ocean" ? "" : `theme-${name}`;
+  // keep the Android status bar / browser chrome in sync with the active theme
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", THEME_BAR_COLORS[name] || THEME_BAR_COLORS.ocean);
   try { localStorage.setItem(THEME_KEY, name); } catch {}
 }
 function getTheme() {
@@ -198,7 +202,7 @@ function exportCSV() {
   const a = document.createElement("a");
   const stamp = todayStr().replace(/-/g, "");
   a.href = url;
-  a.download = `口座記録_${stamp}.csv`;
+  a.download = `FX_LIFE_${stamp}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -441,7 +445,7 @@ function render() {
       <div class="header-title-row">
         <div class="header-title-left">
           <span class="header-mark"></span>
-          <h1>口座記録</h1>
+          <h1>FX LIFE</h1>
         </div>
         <div class="theme-switcher">
           <button class="theme-dot-btn ${getTheme() === "ocean" ? "active" : ""}" onclick="setTheme('ocean')" aria-label="オーシャン"><span class="theme-dot ocean"></span></button>

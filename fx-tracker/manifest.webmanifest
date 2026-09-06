@@ -1,6 +1,6 @@
 {
-  "name": "口座記録 - 365FX 余力確認の推移",
-  "short_name": "口座記録",
+  "name": "FX LIFE - 365FX 余力確認の推移",
+  "short_name": "FX LIFE",
   "description": "365FXの余力確認画面をスクリーンショットから記録し、グラフで推移を確認するアプリ",
   "start_url": "./index.html",
   "scope": "./",
@@ -10,9 +10,29 @@
   "theme_color": "#0A1826",
   "lang": "ja",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
