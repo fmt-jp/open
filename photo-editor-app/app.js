@@ -272,14 +272,20 @@ function setMode(mode) {
   if (mode === 'crop') {
     els.canvasHint.hidden = false;
     els.canvasHint.textContent = '枠をドラッグして移動、ハンドルでサイズを変更できます';
+    els.canvas.style.maxWidth = '90%';
+    els.canvas.style.maxHeight = '90%';
     // クロップタブに入った時点の枠を記憶しておく(「キャンセル」で復元するため)
     cropSnapshot = { ...state.cropFrame };
     renderCropStage();
   } else if (mode === 'exif') {
+    els.canvas.style.maxWidth = '';
+    els.canvas.style.maxHeight = '';
     // EXIFタブに入った時点の設定を記憶しておく(「キャンセル」で復元するため)
     exifSnapshot = JSON.parse(JSON.stringify(state.exif));
     renderFinal();
   } else {
+    els.canvas.style.maxWidth = '';
+    els.canvas.style.maxHeight = '';
     renderFinal();
     if (mode === 'hide') syncHideOverlay();
   }
