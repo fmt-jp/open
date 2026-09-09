@@ -92,7 +92,8 @@ function saveEntries(list) {
 // ---------------------------------------------------------------------------
 const state = {
   entries: loadEntries(),
-  tab: "list", // list | add | chart
+  module: "yoryoku", // yoryoku | analyze
+  tab: "list", // list | add | chart（余力確認モジュール内）
   form: { date: todayStr(), values: emptyValues() },
   error: "",
   selectedFields: ["jika_hyoka_sogaku", "shokyokin_iji"],
@@ -108,14 +109,33 @@ let chartInstance = null;
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
-function setTab(tab) {
-  // arriving at "add" via the nav bar (not via startEdit) should start a fresh form
-  if (tab === "add" && state.tab !== "add" && !state.editingId) {
+// URL のハッシュを画面状態の唯一の情報源にしている。こうすると Android の戻るボタンが
+// 「アプリ終了」ではなく「ひとつ前の画面へ」という自然な動きになる。
+function hashFor(module, tab) {
+  return module === "analyze" ? "#/analyze" : `#/yoryoku/${tab || "list"}`;
+}
+function navigate(hash) {
+  if (location.hash === hash) applyHash();
+  else location.hash = hash;   // hashchange 経由で applyHash が走る
+}
+function applyHash() {
+  const m = /^#\/(yoryoku|analyze)(?:\/(list|add|chart))?/.exec(location.hash || "");
+  const module = m ? m[1] : "yoryoku";
+  const tab = (m && m[2]) || "list";
+
+  // ナビから「追加」に来たときは新規入力にする（編集中に再描画された場合は保持）
+  if (module === "yoryoku" && tab === "add" &&
+      !(state.module === "yoryoku" && state.tab === "add") && !state.editingId) {
     resetForm();
   }
-  state.tab = tab;
+  state.module = module;
+  if (module === "yoryoku") state.tab = tab;
   render();
 }
+window.addEventListener("hashchange", applyHash);
+
+function setTab(tab) { navigate(hashFor("yoryoku", tab)); }
+function setModule(module) { navigate(hashFor(module, state.tab)); }
 function setDate(v) { state.form.date = v; }
 function setValue(key, v) { state.form.values[key] = v; }
 function toggleFieldPicker() { state.fieldPickerOpen = !state.fieldPickerOpen; render(); }
@@ -146,13 +166,11 @@ function startEdit(id) {
   );
   state.error = "";
   state.ocrStatus = "idle";
-  state.tab = "add";
-  render();
+  navigate(hashFor("yoryoku", "add"));
 }
 function cancelEdit() {
   resetForm();
-  state.tab = "list";
-  render();
+  navigate(hashFor("yoryoku", "list"));
 }
 
 function handleAdd() {
@@ -177,8 +195,7 @@ function handleAdd() {
   state.entries = [...base, newEntry].sort((a, b) => a.date.localeCompare(b.date));
   saveEntries(state.entries);
   resetForm();
-  state.tab = "list";
-  render();
+  navigate(hashFor("yoryoku", "list"));
 }
 function handleDelete(id) {
   state.entries = state.entries.filter(e => e.id !== id);
@@ -440,6 +457,7 @@ async function handleImageFile(file) {
 // ---------------------------------------------------------------------------
 function render() {
   const app = document.getElementById("app");
+  const yoryoku = state.module === "yoryoku";
   app.innerHTML = `
     <header>
       <div class="header-title-row">
@@ -453,17 +471,34 @@ function render() {
           <button class="theme-dot-btn ${getTheme() === "silver" ? "active" : ""}" onclick="setTheme('silver')" aria-label="シルバー"><span class="theme-dot silver"></span></button>
         </div>
       </div>
-      <p class="header-sub">365FX 余力確認の推移</p>
+      <p class="header-sub">${yoryoku ? "365FX 余力確認の推移" : "チャート分析 — USD/JPY 1時間足"}</p>
     </header>
+    ${yoryoku ? `
     <nav class="tabs">
       <button class="tab-btn ${state.tab === "list" ? "active" : ""}" onclick="setTab('list')">記録</button>
       <button class="tab-btn ${state.tab === "add" ? "active" : ""}" onclick="setTab('add')">追加</button>
       <button class="tab-btn ${state.tab === "chart" ? "active" : ""}" onclick="setTab('chart')">グラフ</button>
+    </nav>` : ""}
+    <main>${
+      !yoryoku ? Analyze.view()
+        : state.tab === "list" ? renderList()
+        : state.tab === "add" ? renderAdd()
+        : renderChart()
+    }</main>
+    <nav class="modules">
+      <button class="mod-btn ${yoryoku ? "active" : ""}" onclick="setModule('yoryoku')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+        <span>余力確認</span>
+      </button>
+      <button class="mod-btn ${!yoryoku ? "active" : ""}" onclick="setModule('analyze')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M17 4v16"/><rect x="4" y="8" width="6" height="7" rx="1.4"/><rect x="14" y="6" width="6" height="9" rx="1.4"/></svg>
+        <span>チャート分析</span>
+      </button>
     </nav>
-    <main>${state.tab === "list" ? renderList() : state.tab === "add" ? renderAdd() : renderChart()}</main>
   `;
-  if (state.tab === "add") bindAddInputs();
-  if (state.tab === "chart") drawChart();
+  if (yoryoku && state.tab === "add") bindAddInputs();
+  if (yoryoku && state.tab === "chart") drawChart();
+  if (!yoryoku) Analyze.mount();
 }
 
 function renderList() {
@@ -728,4 +763,4 @@ function drawChart() {
   });
 }
 
-render();
+applyHash();

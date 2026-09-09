@@ -1,10 +1,11 @@
 // bump this string whenever any cached file changes, to invalidate old caches
-const CACHE_VERSION = "fx-life-v6";
+const CACHE_VERSION = "fx-life-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./analyze.js",
   "./manifest.webmanifest",
   "./libs/chart.umd.min.js",
   "./libs/tesseract.min.js",
