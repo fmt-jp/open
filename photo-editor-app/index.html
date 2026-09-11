@@ -94,35 +94,37 @@
         <button id="exif-disable-all" class="btn-flat">すべて無効にする</button>
       </div>
 
-      <div class="panel-row">
-        <span class="panel-label">位置</span>
-        <div class="segmented" id="exif-position">
-          <button data-pos="left" class="active">左</button>
-          <button data-pos="center">中央</button>
-          <button data-pos="right">右</button>
+      <div class="row">
+        <span class="row-label">位置</span>
+        <div class="mini-grid" id="exif-position">
+          <button class="mini-card on" data-pos="left"><div class="pos-icon pos-left"><i></i><i></i><i></i></div><span class="m-label">左</span></button>
+          <button class="mini-card" data-pos="center"><div class="pos-icon pos-center"><i></i><i></i><i></i></div><span class="m-label">中央</span></button>
+          <button class="mini-card" data-pos="right"><div class="pos-icon pos-right"><i></i><i></i><i></i></div><span class="m-label">右</span></button>
         </div>
       </div>
 
-      <div class="panel-row">
-        <span class="panel-label">文字サイズ</span>
+      <div class="row">
+        <span class="row-label">文字サイズ</span>
         <input type="range" id="exif-size" min="12" max="64" value="26">
       </div>
 
-      <div class="panel-row">
-        <span class="panel-label">文字色</span>
-        <div class="segmented" id="exif-color">
-          <button data-color="white" class="active">白</button>
-          <button data-color="black">黒</button>
+      <div class="row">
+        <span class="row-label">文字色</span>
+        <div class="mini-grid" id="exif-color">
+          <button class="mini-card on" data-color="white"><div class="mini-swatch" style="background:#fff"></div></button>
+          <button class="mini-card" data-color="black"><div class="mini-swatch" style="background:#000"></div></button>
+          <button class="mini-card" data-color="orange"><div class="mini-swatch" style="background:#e8a33d"></div></button>
+          <button class="mini-card" data-color="custom"><div class="mini-swatch custom-swatch" id="exif-color-custom-preview"></div></button>
         </div>
-        <input type="color" id="exif-color-custom" value="#ffffff" title="カスタム色">
+        <input type="color" id="exif-color-custom" value="#ffffff" style="position:absolute; width:1px; height:1px; opacity:0; border:none; padding:0; pointer-events:none;">
       </div>
 
-      <div class="panel-row">
-        <span class="panel-label">縁取り</span>
-        <div class="segmented" id="exif-outline">
-          <button data-outline="white-black" class="active">白文字+黒縁</button>
-          <button data-outline="black-white">黒文字+白縁</button>
-          <button data-outline="none">なし</button>
+      <div class="row">
+        <span class="row-label">縁取り</span>
+        <div class="mini-grid" id="exif-outline">
+          <button class="mini-card on ol-white-black" data-outline="white-black"><span class="mini-outline">Aa</span><span class="m-label">白+黒</span></button>
+          <button class="mini-card ol-black-white" data-outline="black-white"><span class="mini-outline">Aa</span><span class="m-label">黒+白</span></button>
+          <button class="mini-card ol-none" data-outline="none"><span class="mini-outline">Aa</span><span class="m-label">なし</span></button>
         </div>
       </div>
 
@@ -141,26 +143,22 @@
         </button>
         <button id="hide-add" class="btn-flat">＋追加</button>
       </div>
-      <div class="section-title">隠し方</div>
-      <div class="card-grid method-grid" id="hide-method">
-        <button class="g-card on" data-method="mosaic">
-          <div class="method-preview mosaic-preview"></div>
-          <span class="g-label">モザイク</span>
-        </button>
-        <button class="g-card" data-method="icon">
-          <div class="method-preview icon-preview-face" id="hide-method-icon-preview">🕶️</div>
-          <span class="g-label">アイコン</span>
-        </button>
+      <div class="row">
+        <span class="row-label">隠し方</span>
+        <div class="mini-grid" id="hide-method">
+          <button class="mini-card on" data-method="mosaic"><div class="method-icon mosaic-mini"></div><span class="m-label">モザイク</span></button>
+          <button class="mini-card" data-method="icon"><div class="method-icon" id="hide-method-icon-preview">🕶️</div><span class="m-label">アイコン</span></button>
+        </div>
       </div>
-      <div id="hide-icon-row" hidden>
-        <div class="section-title">アイコン</div>
-        <div class="card-grid icon-grid" id="hide-icon-choice">
-          <button class="g-card on" data-icon="🕶️"><span class="g-emoji">🕶️</span></button>
-          <button class="g-card" data-icon="⬛"><span class="g-emoji">⬛</span></button>
-          <button class="g-card" data-icon="😶"><span class="g-emoji">😶</span></button>
-          <button class="g-card" data-icon="😷"><span class="g-emoji">😷</span></button>
-          <button class="g-card" data-icon="🚫"><span class="g-emoji">🚫</span></button>
-          <button class="g-card" data-icon="❓"><span class="g-emoji">❓</span></button>
+      <div class="row" id="hide-icon-row" hidden>
+        <span class="row-label">アイコン</span>
+        <div class="icon-scroll" id="hide-icon-choice">
+          <button class="icon-card on" data-icon="🕶️">🕶️</button>
+          <button class="icon-card" data-icon="⬛">⬛</button>
+          <button class="icon-card" data-icon="😶">😶</button>
+          <button class="icon-card" data-icon="😷">😷</button>
+          <button class="icon-card" data-icon="🚫">🚫</button>
+          <button class="icon-card" data-icon="❓">❓</button>
         </div>
       </div>
       <div class="section-title">検出・追加された範囲</div>

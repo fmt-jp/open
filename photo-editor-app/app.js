@@ -559,28 +559,35 @@ function buildExifFieldChips() {
 els.exifPos.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   state.exif.position = btn.dataset.pos;
-  $$('button', els.exifPos).forEach(b => b.classList.toggle('active', b === btn));
+  $$('button', els.exifPos).forEach(b => b.classList.toggle('on', b === btn));
   renderFinal();
 });
 els.exifSize.addEventListener('input', () => { state.exif.size = +els.exifSize.value; renderFinal(); });
+
+const EXIF_COLOR_PRESETS = { white: '#ffffff', black: '#000000', orange: '#e8a33d' };
 els.exifColor.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
+  if (btn.dataset.color === 'custom') {
+    els.exifColorCustom.click();
+    return;
+  }
   state.exif.colorPreset = btn.dataset.color;
-  state.exif.color = btn.dataset.color === 'white' ? '#ffffff' : '#000000';
+  state.exif.color = EXIF_COLOR_PRESETS[btn.dataset.color];
   els.exifColorCustom.value = state.exif.color;
-  $$('button', els.exifColor).forEach(b => b.classList.toggle('active', b === btn));
+  $$('button', els.exifColor).forEach(b => b.classList.toggle('on', b === btn));
   renderFinal();
 });
 els.exifColorCustom.addEventListener('input', () => {
   state.exif.color = els.exifColorCustom.value;
   state.exif.colorPreset = 'custom';
-  $$('button', els.exifColor).forEach(b => b.classList.remove('active'));
+  $('#exif-color-custom-preview').style.background = state.exif.color;
+  $$('button', els.exifColor).forEach(b => b.classList.toggle('on', b.dataset.color === 'custom'));
   renderFinal();
 });
 els.exifOutline.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   state.exif.outline = btn.dataset.outline;
-  $$('button', els.exifOutline).forEach(b => b.classList.toggle('active', b === btn));
+  $$('button', els.exifOutline).forEach(b => b.classList.toggle('on', b === btn));
   renderFinal();
 });
 
@@ -610,11 +617,12 @@ function syncExifControlsFromState() {
     const def = EXIF_FIELD_DEFS[i];
     if (def) card.classList.toggle('on', !!state.exif.fields[def.key] && availableExifValue(def) !== null);
   });
-  $$('button', els.exifPos).forEach(b => b.classList.toggle('active', b.dataset.pos === state.exif.position));
+  $$('button', els.exifPos).forEach(b => b.classList.toggle('on', b.dataset.pos === state.exif.position));
   els.exifSize.value = state.exif.size;
-  $$('button', els.exifColor).forEach(b => b.classList.toggle('active', b.dataset.color === state.exif.colorPreset));
-  els.exifColorCustom.value = state.exif.color;
-  $$('button', els.exifOutline).forEach(b => b.classList.toggle('active', b.dataset.outline === state.exif.outline));
+  $$('button', els.exifColor).forEach(b => b.classList.toggle('on', b.dataset.color === state.exif.colorPreset));
+  els.exifColorCustom.value = state.exif.colorPreset === 'custom' ? state.exif.color : els.exifColorCustom.value;
+  $('#exif-color-custom-preview').style.background = state.exif.colorPreset === 'custom' ? state.exif.color : '';
+  $$('button', els.exifOutline).forEach(b => b.classList.toggle('on', b.dataset.outline === state.exif.outline));
 }
 
 function buildExifLines() {
@@ -956,6 +964,7 @@ els.btnReset.addEventListener('click', () => {
   els.hideIconRow.hidden = true;
   resetExifSettings();
   buildExifFieldChips();
+  syncExifControlsFromState();
   resetCropFrameToAspect('free');
   setMode('crop');
   toast('リセットしました');

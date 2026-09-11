@@ -135,7 +135,6 @@ body{
 }
 .panel-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 0; }
 .panel-row + .panel-row{ border-top:1px solid var(--line); }
-.panel-label{ font-size:13px; color:var(--ink-dim); min-width:56px; }
 
 .action-row{ justify-content:flex-end; gap:10px; }
 .btn-flat{
@@ -144,14 +143,41 @@ body{
 }
 .btn-flat.primary{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
 
-.segmented{ display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; flex:1; }
-.segmented button{
-  flex:1; padding:10px 6px; background:var(--panel-2); color:var(--ink-dim);
-  border:none; font-size:13px; min-height:var(--tap);
-  border-right:1px solid var(--line);
+/* ---------- コンパクトな設定行(位置・文字色・縁取り) ---------- */
+.row{ display:flex; align-items:center; gap:10px; padding:8px 0; }
+.row-label{ font-size:12.5px; color:var(--ink-dim); width:60px; flex-shrink:0; white-space:nowrap; }
+
+.mini-grid{ display:flex; gap:6px; flex:1; }
+.mini-card{
+  position:relative; flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+  padding:9px 4px; min-height:40px; overflow:hidden;
 }
-.segmented button:last-child{ border-right:none; }
-.segmented button.active{ background:var(--accent); color:var(--accent-ink); font-weight:700; }
+.mini-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; }
+.mini-card.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
+.mini-card.on::before{ background:var(--accent); }
+.mini-card .m-label{ font-size:12.5px; font-weight:600; color:var(--ink-dim); white-space:nowrap; }
+.mini-card.on .m-label{ color:var(--ink); }
+
+/* 位置アイコン(小) */
+.pos-icon{ width:20px; height:16px; border:1.3px solid var(--ink-dim); border-radius:3px; display:flex; flex-direction:column; justify-content:flex-end; gap:1.5px; padding:2.5px; flex-shrink:0; }
+.mini-card.on .pos-icon{ border-color:var(--accent); }
+.pos-icon i{ display:block; height:1.6px; background:var(--ink-dim); border-radius:1px; }
+.mini-card.on .pos-icon i{ background:var(--accent); }
+.pos-left i{ width:60%; align-self:flex-start; }
+.pos-center i{ width:60%; align-self:center; }
+.pos-right i{ width:60%; align-self:flex-end; }
+
+/* 文字色スウォッチ(角丸の四角) */
+.mini-swatch{ width:24px; height:24px; border-radius:5px; border:1.5px solid var(--line); flex-shrink:0; }
+.mini-card.on .mini-swatch{ border-color:var(--accent); }
+.custom-swatch{ background:conic-gradient(from 90deg,#ff0000,#ffae00,#fff400,#3cff00,#00fff2,#0033ff,#a600ff,#ff0000); }
+
+/* 縁取りプレビュー(小) */
+.mini-outline{ font-size:14px; font-weight:800; }
+.ol-white-black .mini-outline{ color:#fff; -webkit-text-stroke:1.4px #000; paint-order:stroke fill; }
+.ol-black-white .mini-outline{ color:#000; -webkit-text-stroke:1.4px #fff; paint-order:stroke fill; }
+.ol-none .mini-outline{ color:var(--ink-dim); }
 
 input[type=range]{ flex:1; accent-color:var(--accent); height:var(--tap); }
 input[type=color]{ width:38px; height:38px; border:none; background:none; padding:0; border-radius:8px; overflow:hidden; }
@@ -211,20 +237,29 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 .r-16-9 i{ width:30px; height:16.9px; }
 .r-9-16 i{ width:16.9px; height:30px; }
 
-/* 隠す: 隠し方カード(モザイク/アイコン) */
-.method-grid{ grid-template-columns:repeat(2,1fr); margin-bottom:4px; }
-.method-preview{ width:56px; height:40px; border-radius:6px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#111; font-size:22px; }
-.mosaic-preview{
+/* 隠す: 隠し方(コンパクトな横並びカード、.row/.mini-cardを再利用) */
+.method-icon{ width:20px; height:16px; border-radius:3px; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.mosaic-mini{
   background-image:
-    linear-gradient(45deg,#555 25%,transparent 25%,transparent 75%,#555 75%),
-    linear-gradient(45deg,#555 25%,transparent 25%,transparent 75%,#555 75%);
-  background-size:10px 10px; background-position:0 0, 5px 5px; background-color:#333;
+    linear-gradient(45deg,#666 25%,transparent 25%,transparent 75%,#666 75%),
+    linear-gradient(45deg,#666 25%,transparent 25%,transparent 75%,#666 75%);
+  background-size:6px 6px; background-position:0 0, 3px 3px; background-color:#3a3a3a;
 }
 
-/* 隠す: アイコン選択カード(絵文字のみ) */
-.icon-grid{ margin-bottom:4px; }
-.icon-grid .g-card{ padding:16px 6px; }
-.icon-grid .g-emoji{ font-size:32px; line-height:1; }
+/* 隠す: アイコン選択(1段の横スクロール、絵文字のみ) */
+.icon-scroll{
+  display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity; flex:1;
+}
+.icon-scroll::-webkit-scrollbar{ display:none; }
+.icon-scroll .icon-card{
+  flex:0 0 auto; width:44px; height:44px; scroll-snap-align:start;
+  position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+  display:flex; align-items:center; justify-content:center; font-size:24px;
+}
+.icon-scroll .icon-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; border-radius:9px 0 0 9px; }
+.icon-scroll .icon-card.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
+.icon-scroll .icon-card.on::before{ background:var(--accent); }
 
 .hint-text{ font-size:13px; color:var(--ink-dim); padding:6px 0; }
 
