@@ -61,6 +61,7 @@ const els = {
   hideDetect: $('#hide-detect'),
   hideAdd:    $('#hide-add'),
   hideMethod: $('#hide-method'),
+  hideMethodIconPreview: $('#hide-method-icon-preview'),
   hideIconRow: $('#hide-icon-row'),
   hideIconChoice: $('#hide-icon-choice'),
   hideList:   $('#hide-list'),
@@ -320,10 +321,10 @@ function resetCropFrameToAspect(aspectKey) {
 }
 
 function syncAspectChipUI() {
-  $$('#panel-crop .chip').forEach(c => c.classList.toggle('active', c.dataset.aspect === state.crop.aspect));
+  $$('#panel-crop .g-card').forEach(c => c.classList.toggle('on', c.dataset.aspect === state.crop.aspect));
 }
 
-$$('#panel-crop .chip').forEach(chip => {
+$$('#panel-crop .g-card').forEach(chip => {
   chip.addEventListener('click', () => resetCropFrameToAspect(chip.dataset.aspect));
 });
 
@@ -535,17 +536,23 @@ function buildExifFieldChips() {
 
   EXIF_FIELD_DEFS.forEach(f => {
     const val = availableExifValue(f);
-    const chip = document.createElement('button');
-    chip.className = 'toggle-chip' + (state.exif.fields[f.key] && val !== null ? ' active' : '');
-    chip.textContent = f.label;
-    chip.disabled = val === null;
-    chip.style.opacity = val === null ? .35 : 1;
-    chip.addEventListener('click', () => {
+    const card = document.createElement('button');
+    card.className = 'field-card' + (state.exif.fields[f.key] && val !== null ? ' on' : '');
+    card.disabled = val === null;
+    const labelEl = document.createElement('span');
+    labelEl.className = 'f-label';
+    labelEl.textContent = f.label;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'f-value';
+    valueEl.textContent = val !== null ? val : '—';
+    card.appendChild(labelEl);
+    card.appendChild(valueEl);
+    card.addEventListener('click', () => {
       state.exif.fields[f.key] = !state.exif.fields[f.key];
-      chip.classList.toggle('active', state.exif.fields[f.key]);
+      card.classList.toggle('on', state.exif.fields[f.key]);
       renderFinal();
     });
-    els.exifFields.appendChild(chip);
+    els.exifFields.appendChild(card);
   });
 }
 
@@ -599,9 +606,9 @@ els.exifCancel.addEventListener('click', () => {
 
 function syncExifControlsFromState() {
   // state.exif の内容(キャンセルで復元された値など)をUIへ反映しなおす
-  $$('#exif-fields .toggle-chip').forEach((chip, i) => {
+  $$('#exif-fields .field-card').forEach((card, i) => {
     const def = EXIF_FIELD_DEFS[i];
-    if (def) chip.classList.toggle('active', !!state.exif.fields[def.key] && availableExifValue(def) !== null);
+    if (def) card.classList.toggle('on', !!state.exif.fields[def.key] && availableExifValue(def) !== null);
   });
   $$('button', els.exifPos).forEach(b => b.classList.toggle('active', b.dataset.pos === state.exif.position));
   els.exifSize.value = state.exif.size;
@@ -729,7 +736,7 @@ function makeRegion(x, y, w, h, type, source) {
 els.hideMethod.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   state.hideMethod = btn.dataset.method;
-  $$('button', els.hideMethod).forEach(b => b.classList.toggle('active', b === btn));
+  $$('button', els.hideMethod).forEach(b => b.classList.toggle('on', b === btn));
   els.hideIconRow.hidden = state.hideMethod !== 'icon';
   // 既に検出/追加済みの範囲にも新しい隠し方を反映する
   state.hideRegions.forEach(r => { r.method = state.hideMethod; r.icon = state.hideIcon; });
@@ -739,7 +746,8 @@ els.hideMethod.addEventListener('click', e => {
 els.hideIconChoice.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   state.hideIcon = btn.dataset.icon;
-  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('active', b === btn));
+  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('on', b === btn));
+  els.hideMethodIconPreview.textContent = state.hideIcon;
   state.hideRegions.forEach(r => { r.icon = state.hideIcon; });
   renderFinal();
 });
@@ -843,11 +851,11 @@ function renderHideList() {
   }
   state.hideRegions.forEach(r => {
     const row = document.createElement('div');
-    row.className = 'hide-item';
+    row.className = 'hide-item' + (r.enabled ? ' on' : '');
     const label = r.type === 'face' ? '顔' : r.type === 'plate' ? 'ナンバー' : '手動範囲';
     row.innerHTML = `
       <span class="tag ${r.source === 'auto' ? 'auto' : ''}">${r.source === 'auto' ? 'AI検出' : '手動'}</span>
-      <span>${label}</span>
+      <span class="name">${label}</span>
       <button data-act="toggle">${r.enabled ? 'ON' : 'OFF'}</button>
       <button data-act="del" class="del">削除</button>`;
     row.querySelector('[data-act="toggle"]').addEventListener('click', () => {
@@ -942,8 +950,9 @@ els.btnReset.addEventListener('click', () => {
   state.hideRegions = [];
   state.hideMethod = 'mosaic';
   state.hideIcon = '🕶️';
-  $$('button', els.hideMethod).forEach(b => b.classList.toggle('active', b.dataset.method === 'mosaic'));
-  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('active', b.dataset.icon === '🕶️'));
+  $$('button', els.hideMethod).forEach(b => b.classList.toggle('on', b.dataset.method === 'mosaic'));
+  $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('on', b.dataset.icon === '🕶️'));
+  els.hideMethodIconPreview.textContent = '🕶️';
   els.hideIconRow.hidden = true;
   resetExifSettings();
   buildExifFieldChips();

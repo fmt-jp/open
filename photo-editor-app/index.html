@@ -71,14 +71,14 @@
 
     <!-- ===== コンテキストパネル(モードごとの操作) ===== -->
     <div id="panel-crop" class="panel" hidden>
-      <div class="panel-row aspect-row">
-        <button class="chip" data-aspect="free">自由</button>
-        <button class="chip" data-aspect="orig">元比率</button>
-        <button class="chip" data-aspect="1:1">1:1</button>
-        <button class="chip" data-aspect="4:3">4:3</button>
-        <button class="chip" data-aspect="3:4">3:4</button>
-        <button class="chip" data-aspect="16:9">16:9</button>
-        <button class="chip" data-aspect="9:16">9:16</button>
+      <div class="aspect-scroll" id="aspect-scroll">
+        <button class="g-card on r-free" data-aspect="free"><div class="ratio-box"><i></i></div><span class="g-label">自由</span></button>
+        <button class="g-card r-orig" data-aspect="orig"><div class="ratio-box"><i></i></div><span class="g-label">元比率</span></button>
+        <button class="g-card r-1-1" data-aspect="1:1"><div class="ratio-box"><i></i></div><span class="g-label">1:1</span></button>
+        <button class="g-card r-4-3" data-aspect="4:3"><div class="ratio-box"><i></i></div><span class="g-label">4:3</span></button>
+        <button class="g-card r-3-4" data-aspect="3:4"><div class="ratio-box"><i></i></div><span class="g-label">3:4</span></button>
+        <button class="g-card r-16-9" data-aspect="16:9"><div class="ratio-box"><i></i></div><span class="g-label">16:9</span></button>
+        <button class="g-card r-9-16" data-aspect="9:16"><div class="ratio-box"><i></i></div><span class="g-label">9:16</span></button>
       </div>
       <div class="panel-row action-row">
         <button id="crop-cancel" class="btn-flat">キャンセル</button>
@@ -88,7 +88,8 @@
 
     <div id="panel-exif" class="panel" hidden>
       <div id="exif-empty" class="hint-text" hidden>この写真にはEXIF情報が見つかりませんでした。</div>
-      <div id="exif-fields" class="panel-row toggle-row"></div>
+      <div id="exif-fields" class="field-grid"></div>
+      <p class="field-hint">タップして写真に焼き込む項目を選択(点灯 = 表示する)</p>
       <div class="panel-row">
         <button id="exif-disable-all" class="btn-flat">すべて無効にする</button>
       </div>
@@ -140,24 +141,29 @@
         </button>
         <button id="hide-add" class="btn-flat">＋追加</button>
       </div>
-      <div class="panel-row">
-        <span class="panel-label">隠し方</span>
-        <div class="segmented" id="hide-method">
-          <button data-method="mosaic" class="active">モザイク</button>
-          <button data-method="icon">アイコン</button>
+      <div class="section-title">隠し方</div>
+      <div class="card-grid method-grid" id="hide-method">
+        <button class="g-card on" data-method="mosaic">
+          <div class="method-preview mosaic-preview"></div>
+          <span class="g-label">モザイク</span>
+        </button>
+        <button class="g-card" data-method="icon">
+          <div class="method-preview icon-preview-face" id="hide-method-icon-preview">🕶️</div>
+          <span class="g-label">アイコン</span>
+        </button>
+      </div>
+      <div id="hide-icon-row" hidden>
+        <div class="section-title">アイコン</div>
+        <div class="card-grid icon-grid" id="hide-icon-choice">
+          <button class="g-card on" data-icon="🕶️"><span class="g-emoji">🕶️</span></button>
+          <button class="g-card" data-icon="⬛"><span class="g-emoji">⬛</span></button>
+          <button class="g-card" data-icon="😶"><span class="g-emoji">😶</span></button>
+          <button class="g-card" data-icon="😷"><span class="g-emoji">😷</span></button>
+          <button class="g-card" data-icon="🚫"><span class="g-emoji">🚫</span></button>
+          <button class="g-card" data-icon="❓"><span class="g-emoji">❓</span></button>
         </div>
       </div>
-      <div class="panel-row" id="hide-icon-row" hidden>
-        <span class="panel-label">アイコン</span>
-        <div class="icon-choice" id="hide-icon-choice">
-          <button data-icon="🕶️" class="active">🕶️</button>
-          <button data-icon="⬛">⬛</button>
-          <button data-icon="😶">😶</button>
-          <button data-icon="😷">😷</button>
-          <button data-icon="🚫">🚫</button>
-          <button data-icon="❓">❓</button>
-        </div>
-      </div>
+      <div class="section-title">検出・追加された範囲</div>
       <div id="hide-list" class="hide-list"></div>
     </div>
 

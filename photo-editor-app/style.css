@@ -137,12 +137,6 @@ body{
 .panel-row + .panel-row{ border-top:1px solid var(--line); }
 .panel-label{ font-size:13px; color:var(--ink-dim); min-width:56px; }
 
-.chip{
-  padding:9px 14px; border-radius:20px; border:1px solid var(--line);
-  background:var(--panel-2); color:var(--ink); font-size:14px; min-height:var(--tap);
-}
-.chip.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
-
 .action-row{ justify-content:flex-end; gap:10px; }
 .btn-flat{
   padding:11px 18px; border-radius:10px; border:1px solid var(--line);
@@ -162,31 +156,91 @@ body{
 input[type=range]{ flex:1; accent-color:var(--accent); height:var(--tap); }
 input[type=color]{ width:38px; height:38px; border:none; background:none; padding:0; border-radius:8px; overflow:hidden; }
 
-.toggle-row{ gap:8px; }
-.toggle-chip{
-  padding:9px 12px; border-radius:20px; border:1px solid var(--line);
-  background:var(--panel-2); color:var(--ink-dim); font-size:13px; min-height:36px;
+.section-title{ font-size:12px; color:var(--ink-dim); margin:10px 2px 8px; letter-spacing:.04em; }
+.section-title:first-child{ margin-top:2px; }
+
+/* ---------- 共通カードグリッド(EXIF項目・アスペクト比・隠し方・アイコン選択で使用) ---------- */
+.card-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+.g-card{
+  position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
+  padding:10px 8px; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
+  min-height:var(--tap);
 }
-.toggle-chip.active{ background:rgba(232,163,61,.18); color:var(--accent); border-color:var(--accent); }
+.g-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; border-radius:10px 0 0 10px; }
+.g-card.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
+.g-card.on::before{ background:var(--accent); }
+.g-card .g-label{ font-size:12.5px; font-weight:600; color:var(--ink-dim); }
+.g-card.on .g-label{ color:var(--ink); }
+
+/* EXIF項目カード(ラベル+実際の値) */
+.field-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding:10px 0 4px; }
+.field-card{
+  position:relative; text-align:left; background:var(--panel-2); border:1px solid var(--line);
+  border-radius:8px; padding:9px 10px 9px 13px; min-height:56px; overflow:hidden;
+}
+.field-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; }
+.field-card .f-label{
+  display:block; font-size:10px; letter-spacing:.04em; color:var(--ink-dim); margin-bottom:3px; font-weight:700;
+}
+.field-card .f-value{
+  display:block; font-size:13.5px; color:var(--ink-dim); font-weight:600;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.field-card.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
+.field-card.on::before{ background:var(--accent); }
+.field-card.on .f-label{ color:var(--accent); }
+.field-card.on .f-value{ color:var(--ink); }
+.field-card:disabled{ opacity:.45; }
+.field-hint{ font-size:12.5px; color:var(--ink-dim); margin:2px 2px 14px; }
+
+/* クロップ: アスペクト比(横スクロールカード) */
+.aspect-scroll{
+  display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+}
+.aspect-scroll::-webkit-scrollbar{ display:none; }
+.aspect-scroll .g-card{ flex:0 0 auto; width:78px; scroll-snap-align:start; }
+.ratio-box{ width:34px; height:34px; display:flex; align-items:center; justify-content:center; }
+.ratio-box i{ display:block; border:2px solid var(--ink-dim); border-radius:3px; }
+.g-card.on .ratio-box i{ border-color:var(--accent); }
+.r-free i{ width:26px; height:26px; border-style:dashed; }
+.r-orig i{ width:26px; height:20px; }
+.r-1-1 i{ width:24px; height:24px; }
+.r-4-3 i{ width:28px; height:21px; }
+.r-3-4 i{ width:21px; height:28px; }
+.r-16-9 i{ width:30px; height:16.9px; }
+.r-9-16 i{ width:16.9px; height:30px; }
+
+/* 隠す: 隠し方カード(モザイク/アイコン) */
+.method-grid{ grid-template-columns:repeat(2,1fr); margin-bottom:4px; }
+.method-preview{ width:56px; height:40px; border-radius:6px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#111; font-size:22px; }
+.mosaic-preview{
+  background-image:
+    linear-gradient(45deg,#555 25%,transparent 25%,transparent 75%,#555 75%),
+    linear-gradient(45deg,#555 25%,transparent 25%,transparent 75%,#555 75%);
+  background-size:10px 10px; background-position:0 0, 5px 5px; background-color:#333;
+}
+
+/* 隠す: アイコン選択カード(絵文字のみ) */
+.icon-grid{ margin-bottom:4px; }
+.icon-grid .g-card{ padding:16px 6px; }
+.icon-grid .g-emoji{ font-size:32px; line-height:1; }
 
 .hint-text{ font-size:13px; color:var(--ink-dim); padding:6px 0; }
 
-.icon-choice{ display:flex; gap:8px; flex-wrap:wrap; }
-.icon-choice button{
-  width:44px; height:44px; font-size:22px; border-radius:10px;
-  border:1px solid var(--line); background:var(--panel-2);
-  display:flex; align-items:center; justify-content:center;
-}
-.icon-choice button.active{ border-color:var(--accent); background:rgba(232,163,61,.18); }
-
-.hide-list{ display:flex; flex-direction:column; gap:6px; max-height:110px; overflow-y:auto; }
+.hide-list{ display:flex; flex-direction:column; gap:8px; max-height:150px; overflow-y:auto; margin-bottom:4px; }
 .hide-item{
-  display:flex; align-items:center; gap:8px; padding:8px 10px;
-  background:var(--panel-2); border-radius:10px; font-size:13px;
+  position:relative; display:flex; align-items:center; gap:10px; padding:10px 12px 10px 15px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:10px; font-size:13px; overflow:hidden;
 }
-.hide-item .tag{ font-size:11px; padding:2px 8px; border-radius:10px; background:var(--panel); color:var(--ink-dim); }
-.hide-item .tag.auto{ color:var(--accent); }
-.hide-item button{ margin-left:auto; background:none; border:none; color:var(--ink-dim); font-size:13px; padding:6px; min-height:32px; }
+.hide-item::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; }
+.hide-item.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
+.hide-item.on::before{ background:var(--accent); }
+.hide-item .tag{ font-size:10.5px; padding:3px 8px; border-radius:8px; background:var(--panel); color:var(--ink-dim); flex-shrink:0; }
+.hide-item.on .tag.auto{ color:var(--accent); }
+.hide-item .name{ flex:1; font-size:14px; font-weight:600; color:var(--ink-dim); }
+.hide-item.on .name{ color:var(--ink); }
+.hide-item button{ background:none; border:none; color:var(--ink-dim); font-size:13px; padding:6px; min-height:32px; }
 .hide-item button.del{ color:var(--danger); }
 
 /* ---------- Bottom bar ---------- */
