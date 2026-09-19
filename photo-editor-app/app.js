@@ -47,6 +47,7 @@ const els = {
   panels: { crop: $('#panel-crop'), exif: $('#panel-exif'), hide: $('#panel-hide') },
   cropApply:  $('#crop-apply'),
   cropCancel: $('#crop-cancel'),
+  cropRotate: $('#crop-rotate'),
   exifEmpty:  $('#exif-empty'),
   exifFields: $('#exif-fields'),
   exifPos:    $('#exif-position'),
@@ -439,6 +440,27 @@ function resizeCropFrame(startFrame, handle, dx, dy) {
   if (!ratio) { state.crop.aspect = 'free'; syncAspectChipUI(); }
   syncCropFrameGeometry();
 }
+
+els.cropRotate.addEventListener('click', () => {
+  const src = state.originalBase;
+  const rotated = document.createElement('canvas');
+  rotated.width = src.height;
+  rotated.height = src.width;
+  const rctx = rotated.getContext('2d');
+  rctx.translate(rotated.width / 2, rotated.height / 2);
+  rctx.rotate(Math.PI / 2); // 時計回りに90度
+  rctx.drawImage(src, -src.width / 2, -src.height / 2);
+
+  // 回転で座標系が変わるため、これまでのクロップ/隠す領域はリセットする
+  state.originalBase = rotated;
+  state.workingBase = cloneCanvas(rotated);
+  state.appliedCropRect = null;
+  state.hideRegions = [];
+  resetCropFrameToAspect('free');
+  cropSnapshot = { ...state.cropFrame };
+  renderCropStage();
+  toast('90度回転しました');
+});
 
 els.cropApply.addEventListener('click', () => {
   const { x, y, w, h } = state.cropFrame;
