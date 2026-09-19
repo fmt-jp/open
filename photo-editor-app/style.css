@@ -44,7 +44,7 @@ body{
   width:var(--tap); height:var(--tap);
   display:flex; align-items:center; justify-content:center;
   background:transparent; border:none; color:var(--ink);
-  border-radius:10px;
+  border-radius:0;
 }
 .icon-btn svg{ width:22px; height:22px; fill:currentColor; }
 .icon-btn:disabled{ opacity:.3; }
@@ -61,7 +61,7 @@ body{
 .picker-card input[type=file]{ display:none; }
 .btn-primary,.btn-secondary{
   display:block; width:100%; padding:14px; margin-bottom:10px;
-  border-radius:12px; font-size:16px; font-weight:600; text-align:center;
+  border-radius:0; font-size:16px; font-weight:600; text-align:center;
   cursor:pointer; border:none;
 }
 .btn-primary{ background:var(--accent); color:var(--accent-ink); }
@@ -114,7 +114,7 @@ body{
 }
 .crop-handle{
   position:absolute; width:26px; height:26px; margin:-13px;
-  background:var(--accent); border-radius:50%; touch-action:none;
+  background:var(--accent); border-radius:0; touch-action:none;
   box-shadow:0 0 0 4px rgba(0,0,0,.35);
 }
 .crop-handle[data-handle="n"]{ top:0; left:50%; cursor:ns-resize; }
@@ -145,7 +145,7 @@ body{
 
 .action-row{ justify-content:flex-end; gap:10px; }
 .btn-flat{
-  padding:11px 18px; border-radius:10px; border:1px solid var(--line);
+  padding:11px 18px; border-radius:0; border:1px solid var(--line);
   background:var(--panel-2); color:var(--ink); font-size:15px; font-weight:600; min-height:var(--tap);
 }
 .btn-flat.primary{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
@@ -157,7 +157,7 @@ body{
 .mini-grid{ display:flex; gap:6px; flex:1; }
 .mini-card{
   position:relative; flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
-  background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:0;
   padding:9px 4px; min-height:40px; overflow:hidden;
 }
 .mini-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; }
@@ -167,16 +167,16 @@ body{
 .mini-card.on .m-label{ color:var(--ink); }
 
 /* 位置アイコン(小) */
-.pos-icon{ width:20px; height:16px; border:1.3px solid var(--ink-dim); border-radius:3px; display:flex; flex-direction:column; justify-content:flex-end; gap:1.5px; padding:2.5px; flex-shrink:0; }
+.pos-icon{ width:20px; height:16px; border:1.3px solid var(--ink-dim); border-radius:0; display:flex; flex-direction:column; justify-content:flex-end; gap:1.5px; padding:2.5px; flex-shrink:0; }
 .mini-card.on .pos-icon{ border-color:var(--accent); }
-.pos-icon i{ display:block; height:1.6px; background:var(--ink-dim); border-radius:1px; }
+.pos-icon i{ display:block; height:1.6px; background:var(--ink-dim); border-radius:0; }
 .mini-card.on .pos-icon i{ background:var(--accent); }
 .pos-left i{ width:60%; align-self:flex-start; }
 .pos-center i{ width:60%; align-self:center; }
 .pos-right i{ width:60%; align-self:flex-end; }
 
 /* 文字色スウォッチ(角丸の四角) */
-.mini-swatch{ width:24px; height:24px; border-radius:5px; border:1.5px solid var(--line); flex-shrink:0; }
+.mini-swatch{ width:24px; height:24px; border-radius:0; border:1.5px solid var(--line); flex-shrink:0; }
 .mini-card.on .mini-swatch{ border-color:var(--accent); }
 .custom-swatch{ background:conic-gradient(from 90deg,#ff0000,#ffae00,#fff400,#3cff00,#00fff2,#0033ff,#a600ff,#ff0000); }
 
@@ -195,11 +195,11 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 /* ---------- 共通カードグリッド(EXIF項目・アスペクト比・隠し方・アイコン選択で使用) ---------- */
 .card-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
 .g-card{
-  position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
+  position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:0;
   padding:10px 8px; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
   min-height:var(--tap);
 }
-.g-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; border-radius:10px 0 0 10px; }
+.g-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; border-radius:0; }
 .g-card.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
 .g-card.on::before{ background:var(--accent); }
 .g-card .g-label{ font-size:12.5px; font-weight:600; color:var(--ink-dim); }
@@ -209,7 +209,7 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 .field-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding:10px 0 4px; }
 .field-card{
   position:relative; text-align:left; background:var(--panel-2); border:1px solid var(--line);
-  border-radius:8px; padding:9px 10px 9px 13px; min-height:56px; overflow:hidden;
+  border-radius:0; padding:9px 10px 9px 13px; min-height:56px; overflow:hidden;
 }
 .field-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; }
 .field-card .f-label{
@@ -234,7 +234,7 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 .aspect-scroll::-webkit-scrollbar{ display:none; }
 .aspect-scroll .g-card{ flex:0 0 auto; width:78px; scroll-snap-align:start; }
 .ratio-box{ width:34px; height:34px; display:flex; align-items:center; justify-content:center; }
-.ratio-box i{ display:block; border:2px solid var(--ink-dim); border-radius:3px; }
+.ratio-box i{ display:block; border:2px solid var(--ink-dim); border-radius:0; }
 .g-card.on .ratio-box i{ border-color:var(--accent); }
 .r-free i{ width:26px; height:26px; border-style:dashed; }
 .r-orig i{ width:26px; height:20px; }
@@ -245,7 +245,7 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 .r-9-16 i{ width:16.9px; height:30px; }
 
 /* 隠す: 隠し方(コンパクトな横並びカード、.row/.mini-cardを再利用) */
-.method-icon{ width:20px; height:16px; border-radius:3px; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.method-icon{ width:20px; height:16px; border-radius:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
 .mosaic-mini{
   background-image:
     linear-gradient(45deg,#666 25%,transparent 25%,transparent 75%,#666 75%),
@@ -261,10 +261,10 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 .icon-scroll::-webkit-scrollbar{ display:none; }
 .icon-scroll .icon-card{
   flex:0 0 auto; width:44px; height:44px; scroll-snap-align:start;
-  position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+  position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:0;
   display:flex; align-items:center; justify-content:center; font-size:24px;
 }
-.icon-scroll .icon-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; border-radius:9px 0 0 9px; }
+.icon-scroll .icon-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; border-radius:0; }
 .icon-scroll .icon-card.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
 .icon-scroll .icon-card.on::before{ background:var(--accent); }
 
@@ -273,12 +273,12 @@ input[type=color]{ width:38px; height:38px; border:none; background:none; paddin
 .hide-list{ display:flex; flex-direction:column; gap:8px; max-height:150px; overflow-y:auto; margin-bottom:4px; }
 .hide-item{
   position:relative; display:flex; align-items:center; gap:10px; padding:10px 12px 10px 15px;
-  background:var(--panel-2); border:1px solid var(--line); border-radius:10px; font-size:13px; overflow:hidden;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:0; font-size:13px; overflow:hidden;
 }
 .hide-item::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; }
 .hide-item.on{ background:#2a2113; border-color:rgba(232,163,61,.35); }
 .hide-item.on::before{ background:var(--accent); }
-.hide-item .tag{ font-size:10.5px; padding:3px 8px; border-radius:8px; background:var(--panel); color:var(--ink-dim); flex-shrink:0; }
+.hide-item .tag{ font-size:10.5px; padding:3px 8px; border-radius:0; background:var(--panel); color:var(--ink-dim); flex-shrink:0; }
 .hide-item.on .tag.auto{ color:var(--accent); }
 .hide-item .name{ flex:1; font-size:14px; font-weight:600; color:var(--ink-dim); }
 .hide-item.on .name{ color:var(--ink); }
