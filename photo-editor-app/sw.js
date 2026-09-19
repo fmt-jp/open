@@ -9,7 +9,7 @@
 // CACHE 名は中身(ASSETS)を変更するたびに数字を上げること。activate 時に旧キャッシュは
 // 自動削除される。skipWaiting/clients.claim により、新しい Service Worker は
 // タブを閉じ直さなくても次のナビゲーションから有効になる。
-const CACHE = 'pixelveil-v6';
+const CACHE = 'pixelveil-v7';
 
 const ASSETS = [
   './',
