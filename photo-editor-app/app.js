@@ -474,7 +474,7 @@ els.cropApply.addEventListener('click', () => {
   // クロップ確定でクロップ後座標系が変わるため、隠す領域はリセット(検出しなおし)
   state.hideRegions = [];
   toast('クロップを適用しました');
-  setMode('exif');
+  setMode('hide');
 });
 
 els.cropCancel.addEventListener('click', () => {
@@ -623,7 +623,6 @@ els.exifDisableAll.addEventListener('click', () => {
 els.exifApply.addEventListener('click', () => {
   exifSnapshot = JSON.parse(JSON.stringify(state.exif));
   toast('EXIF設定を適用しました');
-  setMode('hide');
 });
 
 els.exifCancel.addEventListener('click', () => {
@@ -953,8 +952,8 @@ function renderFinal() {
   els.canvas.height = state.workingBase.height;
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(state.workingBase, 0, 0);
-  drawExifText(ctx, els.canvas.width, els.canvas.height);
   applyHideRegions(ctx, state.workingBase);
+  drawExifText(ctx, els.canvas.width, els.canvas.height);
   syncOverlayGeometry();
 }
 
@@ -999,8 +998,8 @@ els.btnSave.addEventListener('click', () => {
   out.height = state.workingBase.height;
   const octx = out.getContext('2d');
   octx.drawImage(state.workingBase, 0, 0);
-  drawExifText(octx, out.width, out.height);
   applyHideRegions(octx, state.workingBase);
+  drawExifText(octx, out.width, out.height);
 
   out.toBlob(blob => {
     const url = URL.createObjectURL(blob);
