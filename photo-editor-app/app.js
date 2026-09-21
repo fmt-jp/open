@@ -63,6 +63,8 @@ const els = {
   hideAdd:    $('#hide-add'),
   hideMethod: $('#hide-method'),
   hideMethodIconPreview: $('#hide-method-icon-preview'),
+  hideMosaicRow: $('#hide-mosaic-row'),
+  hideMosaicSize: $('#hide-mosaic-size'),
   hideIconRow: $('#hide-icon-row'),
   hideIconChoice: $('#hide-icon-choice'),
   hideList:   $('#hide-list'),
@@ -94,6 +96,7 @@ const state = {
   hideRegions: [],         // { id, x,y,w,h (workingBase基準), type:'face'|'plate'|'manual', method:'mosaic'|'icon', icon, enabled }
   hideMethod: 'mosaic',
   hideIcon: '🕶️',
+  mosaicSize: 16, // モザイク1マスの実ピクセルサイズ(大きいほど粗い)
   faceModelReady: false,
   detecting: false,
 };
@@ -759,7 +762,7 @@ async function runAutoDetect() {
 }
 
 function makeRegion(x, y, w, h, type, source) {
-  return { id: regionSeq++, x, y, w, h, type, source, method: state.hideMethod, icon: state.hideIcon, enabled: true };
+  return { id: regionSeq++, x, y, w, h, type, source, method: state.hideMethod, icon: state.hideIcon, mosaicSize: state.mosaicSize, enabled: true };
 }
 
 els.hideMethod.addEventListener('click', e => {
@@ -767,8 +770,16 @@ els.hideMethod.addEventListener('click', e => {
   state.hideMethod = btn.dataset.method;
   $$('button', els.hideMethod).forEach(b => b.classList.toggle('on', b === btn));
   els.hideIconRow.hidden = state.hideMethod !== 'icon';
+  els.hideMosaicRow.hidden = state.hideMethod !== 'mosaic';
   // 既に検出/追加済みの範囲にも新しい隠し方を反映する
   state.hideRegions.forEach(r => { r.method = state.hideMethod; r.icon = state.hideIcon; });
+  renderFinal();
+});
+
+els.hideMosaicSize.addEventListener('input', () => {
+  state.mosaicSize = +els.hideMosaicSize.value;
+  // 既に検出/追加済みの範囲にも新しい粗さを反映する
+  state.hideRegions.forEach(r => { r.mosaicSize = state.mosaicSize; });
   renderFinal();
 });
 
@@ -905,16 +916,19 @@ function applyHideRegions(targetCtx, sourceCanvas) {
     const y = clamp(r.y, 0, sourceCanvas.height - 1);
     const w = clamp(r.w, 1, sourceCanvas.width - x);
     const h = clamp(r.h, 1, sourceCanvas.height - y);
-    if (r.method === 'mosaic') drawMosaic(targetCtx, sourceCanvas, x, y, w, h);
+    if (r.method === 'mosaic') drawMosaic(targetCtx, sourceCanvas, x, y, w, h, r.mosaicSize);
     else drawIcon(targetCtx, x, y, w, h, r.icon);
   });
 }
 
-function drawMosaic(targetCtx, sourceCanvas, x, y, w, h) {
-  const blocks = 10; // 分割数(小さいほど粗い=隠れる)
+function drawMosaic(targetCtx, sourceCanvas, x, y, w, h, blockSize) {
+  // ブロックの実ピクセルサイズを固定にすることで、範囲の大きさによらず粗さを均一にする
+  const size = Math.max(4, blockSize || state.mosaicSize);
+  const bx = Math.max(1, Math.round(w / size));
+  const by = Math.max(1, Math.round(h / size));
   const small = document.createElement('canvas');
-  small.width = Math.max(1, Math.round(blocks));
-  small.height = Math.max(1, Math.round(blocks * (h / w)) || blocks);
+  small.width = bx;
+  small.height = by;
   const sctx = small.getContext('2d');
   sctx.drawImage(sourceCanvas, x, y, w, h, 0, 0, small.width, small.height);
 
@@ -979,9 +993,12 @@ els.btnReset.addEventListener('click', () => {
   state.hideRegions = [];
   state.hideMethod = 'mosaic';
   state.hideIcon = '🕶️';
+  state.mosaicSize = 16;
   $$('button', els.hideMethod).forEach(b => b.classList.toggle('on', b.dataset.method === 'mosaic'));
   $$('button', els.hideIconChoice).forEach(b => b.classList.toggle('on', b.dataset.icon === '🕶️'));
   els.hideMethodIconPreview.textContent = '🕶️';
+  els.hideMosaicSize.value = 16;
+  els.hideMosaicRow.hidden = false;
   els.hideIconRow.hidden = true;
   resetExifSettings();
   buildExifFieldChips();
