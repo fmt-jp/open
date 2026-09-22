@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="トリコト">
+  <rect width="512" height="512" rx="112" fill="#111113" />
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#f5f5f7" stroke-width="26" />
+  <circle cx="256" cy="256" r="86" fill="#ffd666" />
+  <circle cx="383" cy="129" r="33" fill="#ffd666" />
+</svg>
