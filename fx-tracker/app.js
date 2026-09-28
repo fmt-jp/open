@@ -103,6 +103,7 @@ const state = {
   ocrProgress: 0,
   ocrError: "",
   editingId: null,
+  importPreview: null,   // CSV取り込みの確認画面用
 };
 let chartInstance = null;
 
@@ -224,6 +225,117 @@ function exportCSV() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ---- CSV取り込み ----
+//
+// エクスポートしたCSVをそのまま読み戻せるようにする。列はヘッダー名で対応づけるので、
+// 列の並びが違っても、見覚えのない列が混ざっていても取り込める。
+// 取り込みは既存データを壊しうるので、必ず確認画面を挟んでから実行する。
+
+// 引用符つきのセルに対応した1行分のパーサ（改行を含むセルは想定しない）
+function parseCsvRow(line) {
+  const out = [];
+  let cur = "", inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuote) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }   // "" はエスケープされた引用符
+        else inQuote = false;
+      } else cur += c;
+    } else if (c === '"') inQuote = true;
+    else if (c === ",") { out.push(cur); cur = ""; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out.map(v => v.trim());
+}
+
+function parseImportCsv(text) {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length < 2) return { error: "データ行がありません。" };
+
+  const header = parseCsvRow(lines[0]);
+  if (!/日付/.test(header[0] || "")) {
+    return { error: "1列目が「日付」のCSVではありません。このアプリからエクスポートしたファイルを選んでください。" };
+  }
+
+  // ヘッダー名 → 項目キー の対応表をつくる（"時価評価総額(円)" の形式）
+  const byLabel = Object.fromEntries(ALL_FIELDS.map(f => [`${f.label}(${f.unit})`, f.key]));
+  const colKeys = header.map((h, i) => (i === 0 ? "__date" : byLabel[h] || null));
+  const unknownCols = header.filter((h, i) => i > 0 && !byLabel[h]);
+  const foundKeys = new Set(colKeys.filter(Boolean));
+  const missingCols = ALL_FIELDS.filter(f => !foundKeys.has(f.key)).map(f => f.label);
+  if (foundKeys.size <= 1) {
+    return { error: "見覚えのある項目列が1つもありません。ファイルを確認してください。" };
+  }
+
+  const rows = [];
+  const badLines = [];
+  const seen = new Set();
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseCsvRow(lines[i]);
+    const date = cells[0] || "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { badLines.push(i + 1); continue; }
+    if (seen.has(date)) { badLines.push(i + 1); continue; }   // ファイル内で日付が重複
+    seen.add(date);
+    const values = emptyValues();
+    colKeys.forEach((key, c) => {
+      if (!key || key === "__date") return;
+      values[key] = parseNum(cells[c]);
+    });
+    rows.push({ date, values });
+  }
+  if (rows.length === 0) return { error: "取り込める行がありませんでした。日付の形式は YYYY-MM-DD である必要があります。" };
+
+  rows.sort((a, b) => a.date.localeCompare(b.date));
+  const existing = new Set(state.entries.map(e => e.date));
+  return {
+    rows,
+    unknownCols,
+    missingCols,
+    badLines,
+    dupes: rows.filter(r => existing.has(r.date)).length,
+  };
+}
+
+async function handleImportFile(file) {
+  if (!file) return;
+  state.error = "";
+  try {
+    const text = await file.text();
+    const result = parseImportCsv(text);
+    if (result.error) { state.error = result.error; state.importPreview = null; }
+    else state.importPreview = result;
+  } catch (err) {
+    state.error = "ファイルを読み込めませんでした。";
+    state.importPreview = null;
+  }
+  render();
+}
+
+// mode: "overwrite" = 同じ日付を取り込んだ内容で置き換える / "skip" = 既存の日付は残す
+function confirmImport(mode) {
+  const pv = state.importPreview;
+  if (!pv) return;
+  const existing = new Set(state.entries.map(e => e.date));
+  const incoming = mode === "skip" ? pv.rows.filter(r => !existing.has(r.date)) : pv.rows;
+  const incomingDates = new Set(incoming.map(r => r.date));
+
+  const kept = state.entries.filter(e => !incomingDates.has(e.date));
+  const added = incoming.map(r => ({ id: `${r.date}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, date: r.date, values: r.values }));
+
+  state.entries = [...kept, ...added].sort((a, b) => a.date.localeCompare(b.date));
+  saveEntries(state.entries);
+  state.importPreview = null;
+  render();
+}
+
+function cancelImport() {
+  state.importPreview = null;
+  state.error = "";
+  render();
 }
 
 // ---- OCR ----
@@ -501,12 +613,57 @@ function render() {
   if (!yoryoku) Analyze.mount();
 }
 
+// 取り込み／書き出しのボタン。件数0のときも取り込みだけは使えるようにする
+function renderIoBar(hasEntries) {
+  return `
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+      <span class="io-btn-wrap">
+        <span class="selector-btn io-btn">⭱ CSVを取り込む</span>
+        <input type="file" accept=".csv,text/csv" class="overlay-file-input"
+               onchange="handleImportFile(this.files[0]); this.value='';">
+      </span>
+      ${hasEntries ? `<button class="selector-btn io-btn" onclick="exportCSV()">⭳ CSVをエクスポート</button>` : ""}
+    </div>`;
+}
+
+function renderImportPreview() {
+  const pv = state.importPreview;
+  if (!pv) return "";
+  const from = pv.rows[0].date, to = pv.rows[pv.rows.length - 1].date;
+  const notes = [];
+  if (pv.dupes > 0) notes.push(`うち <b>${pv.dupes}件</b> は既存の記録と同じ日付です`);
+  if (pv.unknownCols.length) notes.push(`見覚えのない列は無視します：${pv.unknownCols.map(escapeHtml).join("、")}`);
+  if (pv.missingCols.length) notes.push(`CSVにない項目は空欄で取り込みます：${pv.missingCols.map(escapeHtml).join("、")}`);
+  if (pv.badLines.length) notes.push(`日付が不正または重複している行は飛ばします：${pv.badLines.length}行`);
+
+  return `
+    <div class="card import-card">
+      <div class="import-title">CSVの取り込み確認</div>
+      <div class="import-lead"><b>${pv.rows.length}件</b>　${escapeHtml(from)} 〜 ${escapeHtml(to)}</div>
+      ${notes.length ? `<ul class="import-notes">${notes.map(n => `<li>${n}</li>`).join("")}</ul>` : ""}
+      <div class="import-actions">
+        ${pv.dupes > 0 ? `
+          <button class="primary-btn" onclick="confirmImport('overwrite')">同じ日付を置き換えて取り込む</button>
+          <button class="selector-btn io-btn" style="justify-content:center" onclick="confirmImport('skip')">既存を残し、${pv.rows.length - pv.dupes}件だけ取り込む</button>
+        ` : `
+          <button class="primary-btn" onclick="confirmImport('overwrite')">${pv.rows.length}件を取り込む</button>
+        `}
+        <button class="selector-btn io-btn" style="justify-content:center" onclick="cancelImport()">キャンセル</button>
+      </div>
+    </div>`;
+}
+
 function renderList() {
+  const err = state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : "";
+
   if (state.entries.length === 0) {
     return `
+      ${err}
+      ${renderImportPreview()}
+      ${renderIoBar(false)}
       <div class="empty-state">
         <p class="empty-title">まだ記録がありません</p>
-        <p class="empty-body">スクリーンショットを読み込むか、数字を入力して最初の記録を残しましょう。</p>
+        <p class="empty-body">スクリーンショットを読み込むか、数字を入力して最初の記録を残しましょう。以前に書き出したCSVを取り込むこともできます。</p>
         <button class="primary-btn" style="width:auto;padding:11px 20px;" onclick="setTab('add')">記録を追加</button>
       </div>`;
   }
@@ -514,9 +671,9 @@ function renderList() {
   // display order for the list card
   const displayKeys = ["jika_hyoka_sogaku", "mikessai_hyoka_songi", "ruikei_swap", "kouza_zandaka", "shokyokin_iji"];
   return `
-    <div style="display:flex;justify-content:flex-end;">
-      <button class="selector-btn" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="exportCSV()">⭳ CSVをエクスポート</button>
-    </div>
+    ${err}
+    ${renderImportPreview()}
+    ${renderIoBar(true)}
     <div style="display:flex;flex-direction:column;gap:10px;">
     ${reversed.map(e => {
       return `

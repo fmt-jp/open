@@ -175,3 +175,14 @@
   .swatch-row { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
   .swatch-row i { width: 15px; height: 15px; border-radius: 4px; flex: none; }
   .ocr-status { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-dim); }
+
+  /* --- CSV取り込み ---------------------------------------------------- */
+  .io-btn-wrap { position: relative; display: inline-block; }
+  .io-btn { width: auto; padding: 8px 14px; font-size: 12.5px; }
+  .import-card { border-color: var(--accent-soft-border); background: var(--accent-soft-bg); }
+  .import-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 7px; }
+  .import-lead { font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .import-lead b { font-size: 17px; }
+  .import-notes { margin: 9px 0 0; padding-left: 17px; font-size: 11.5px; color: var(--text-dim); line-height: 1.8; }
+  .import-actions { display: flex; flex-direction: column; gap: 7px; margin-top: 13px; }
+  .import-actions .primary-btn { margin-top: 0; }

@@ -1,5 +1,5 @@
 // bump this string whenever any cached file changes, to invalidate old caches
-const CACHE_VERSION = "fx-life-v7";
+const CACHE_VERSION = "fx-life-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
