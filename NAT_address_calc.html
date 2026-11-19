@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1:1 NAT アドレス計算機</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* 配置: 上に「確認」、下に「変換定義」の2段。IPは等幅、方向は色(内部=青緑 / 外部=琥珀)で区別 */
+:root{
+  --bg:#f3f5f7; --panel:#ffffff; --ink:#15202b; --muted:#5a6773; --line:#d8dee5;
+  --in:#0a6c86; --in-soft:#d9eef3; --out:#9a5b0a; --out-soft:#fbead2;
+  --bad:#b3261e; --bad-soft:#fbe4e2; --warn:#8a5a00; --warn-soft:#fff1cc; --ok:#1d6b3a;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"IBM Plex Sans JP","Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0f161d; --panel:#17212b; --ink:#e6edf3; --muted:#93a1ae; --line:#2a3744;
+    --in:#5cc3dc; --in-soft:#133947; --out:#f0b45c; --out-soft:#40300f;
+    --bad:#ff8a80; --bad-soft:#47201d; --warn:#f2c35b; --warn-soft:#3b2f0e; --ok:#6fd08c;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f161d; --panel:#17212b; --ink:#e6edf3; --muted:#93a1ae; --line:#2a3744;
+  --in:#5cc3dc; --in-soft:#133947; --out:#f0b45c; --out-soft:#40300f;
+  --bad:#ff8a80; --bad-soft:#47201d; --warn:#f2c35b; --warn-soft:#3b2f0e; --ok:#6fd08c;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);-webkit-text-size-adjust:100%}
+.wrap{max-width:980px;margin:0 auto;padding:24px 16px 56px;display:flex;flex-direction:column;gap:20px}
+header h1{font-size:22px;line-height:1.3;margin:0 0 4px;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:65ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.panel h2{font-size:16px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.panel h2 small{font-weight:400;color:var(--muted);font-size:13px}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+input[type=text],textarea{width:100%;font:inherit;font-family:var(--mono);font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+input[type=text]::placeholder,textarea::placeholder{color:var(--muted);opacity:.7}
+input:focus-visible,textarea:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--in);outline-offset:2px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--in);border-color:var(--in);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.primary{color:#06222b}}
+:root[data-theme="dark"] button.primary{color:#06222b}
+button.link{border:none;background:none;color:var(--in);padding:4px 6px}
+button.link.danger{color:var(--bad)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.grow{flex:1 1 220px;min-width:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:none;border-radius:0;background:transparent;padding:7px 12px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--panel)}
+.err{color:var(--bad);font-size:13px;margin:0}
+.hint{color:var(--muted);font-size:13px;margin:0}
+
+/* 結果 */
+.results{display:flex;flex-direction:column;gap:12px}
+.hit{border:1px solid var(--line);border-left-width:5px;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.hit.out{border-left-color:var(--out)} .hit.in{border-left-color:var(--in)}
+.hit .dir{font-size:13px;font-weight:600}
+.hit.out .dir{color:var(--out)} .hit.in .dir{color:var(--in)}
+.conv{font:500 22px/1.3 var(--mono);display:flex;gap:10px 14px;flex-wrap:wrap;align-items:baseline;font-variant-numeric:tabular-nums}
+.conv .arrow{color:var(--muted)}
+.conv .to{font-weight:600}
+.hit.out .to{color:var(--out)} .hit.in .to{color:var(--in)}
+.meta{color:var(--muted);font-size:13px;display:flex;gap:4px 16px;flex-wrap:wrap}
+.meta b{color:var(--ink);font-weight:500;font-family:var(--mono)}
+.miss{border:1px dashed var(--line);border-radius:8px;padding:14px;color:var(--muted)}
+.bits{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;overflow-x:auto;font:13px/1.4 var(--mono)}
+.bits .lab{color:var(--muted);font-family:var(--sans);font-size:12px;white-space:nowrap}
+.bitrow{display:flex;gap:8px;white-space:nowrap}
+.oct{display:inline-flex}
+.b{font-style:normal;width:.8em;text-align:center;display:inline-block;color:var(--muted)}
+.b.n{background:var(--in-soft);color:var(--ink)}
+.hit.out .b.n.t{background:var(--out-soft)}
+.legend{font-size:12px;color:var(--muted);display:flex;gap:6px 14px;flex-wrap:wrap}
+.legend i{font-style:normal;padding:0 6px;border-radius:3px}
+
+/* 定義表 */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;font-weight:500;color:var(--muted);background:var(--bg);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.ip{font-family:var(--mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+td.inc{color:var(--in)} td.outc{color:var(--out)}
+td.sep{color:var(--muted);padding:9px 0;text-align:center}
+td.num{text-align:right;font-family:var(--mono);color:var(--muted);white-space:nowrap}
+td.act{white-space:nowrap;text-align:right}
+tr.off td:not(.act){opacity:.5}
+.pill{display:inline-block;font-size:12px;border-radius:99px;padding:0 8px;background:var(--warn-soft);color:var(--warn);margin:2px 4px 0 0}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.empty{padding:18px;color:var(--muted);text-align:center}
+.formrow{display:grid;grid-template-columns:1fr 1.2fr 1.2fr auto;gap:12px;align-items:end}
+@media (max-width:700px){.formrow{grid-template-columns:1fr}}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-size:14px;color:var(--muted)}
+.batch-out{margin-top:10px}
+textarea{min-height:110px;resize:vertical}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>1:1 NAT アドレス計算機</h1>
+    <p>内部(ローカル)と外部(グローバル)の対応を定義しておき、実際のIPアドレスがどう変換されるかを確認します。ネットワーク単位の定義では、ネットワーク部だけを置き換えてホスト部は保持します。</p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-check">
+    <h2 id="h-check">変換を確認 <small>アドレスを入力すると、その場で結果が出ます</small></h2>
+    <div class="row">
+      <div class="grow">
+        <label for="ip">IPアドレス</label>
+        <input id="ip" type="text" value="192.168.10.57" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="例: 10.0.1.10">
+      </div>
+      <div>
+        <label id="l-mode">方向</label>
+        <div class="seg" role="group" aria-labelledby="l-mode" id="mode">
+          <button type="button" data-mode="auto" aria-pressed="true">自動判定</button>
+          <button type="button" data-mode="out" aria-pressed="false">内部→外部</button>
+          <button type="button" data-mode="in" aria-pressed="false">外部→内部</button>
+        </div>
+      </div>
+    </div>
+    <p class="err" id="ip-err" hidden></p>
+    <div class="results" id="results" aria-live="polite"></div>
+
+    <details>
+      <summary>複数のアドレスをまとめて確認</summary>
+      <div class="batch-out">
+        <label for="batch">1行に1アドレス</label>
+        <textarea id="batch" spellcheck="false">10.0.1.10
+192.168.10.1
+192.168.10.255
+198.51.100.200
+172.16.0.5
+8.8.8.8</textarea>
+        <div class="tablewrap" style="margin-top:10px"><table id="batch-table" style="min-width:520px"></table></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="panel" aria-labelledby="h-rules">
+    <h2 id="h-rules">変換定義 <small>単一ホスト(10.0.1.10)またはネットワーク(192.168.10.0/24)</small></h2>
+    <form id="form" class="formrow" autocomplete="off">
+      <div><label for="f-name">名前</label><input id="f-name" type="text" placeholder="例: Webサーバ" style="font-family:var(--sans)"></div>
+      <div><label for="f-in">内部(ローカル)</label><input id="f-in" type="text" placeholder="10.0.1.10 または 10.0.1.0/24" spellcheck="false"></div>
+      <div><label for="f-out">外部(グローバル)</label><input id="f-out" type="text" placeholder="203.0.113.10 または 203.0.113.0/24" spellcheck="false"></div>
+      <div class="row" style="flex-wrap:nowrap"><button type="submit" class="primary" id="f-submit">追加</button><button type="button" id="f-cancel" hidden>取消</button></div>
+    </form>
+    <p class="err" id="form-err" hidden></p>
+    <div class="tablewrap"><table id="rules"></table></div>
+    <p class="hint">同じ範囲が複数の定義に当たる場合は、プレフィックスが長い定義を優先します。定義はこのブラウザに保存されます。</p>
+
+    <details>
+      <summary>定義の書き出し・読み込み (JSON)</summary>
+      <div class="batch-out">
+        <textarea id="io" spellcheck="false" aria-label="定義のJSON"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button type="button" id="io-export">書き出し</button>
+          <button type="button" id="io-copy">コピー</button>
+          <button type="button" id="io-import">この内容で置き換える</button>
+        </div>
+        <p class="err" id="io-msg" hidden></p>
+      </div>
+    </details>
+  </section>
+</div>
+
+<script>
+/*LOGIC*/
+const maskOf=len=>len===0?0:((0xFFFFFFFF<<(32-len))>>>0);
+function parseIP(s){
+  const m=/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(s).trim());
+  if(!m) return null;
+  let v=0;
+  for(let i=1;i<=4;i++){
+    const p=m[i];
+    if(p.length>1&&p[0]==='0') return null;
+    const n=+p; if(n>255) return null;
+    v=v*256+n;
+  }
+  return v>>>0;
+}
+const ipStr=v=>[v>>>24,(v>>>16)&255,(v>>>8)&255,v&255].join('.');
+function parseNet(s){
+  const parts=String(s).trim().split('/');
+  if(parts.length>2) return {error:'「/」は1つだけ指定してください。'};
+  const addr=parseIP(parts[0]);
+  if(addr===null) return {error:'IPアドレスの形式が正しくありません (例: 10.0.1.10)。先頭が0の数字は使えません。'};
+  let len=32;
+  if(parts.length===2){
+    if(!/^\d{1,2}$/.test(parts[1])||+parts[1]>32) return {error:'プレフィックス長は0〜32で指定してください。'};
+    len=+parts[1];
+  }
+  const net=(addr&maskOf(len))>>>0;
+  return {addr,len,net,adjusted:net!==addr};
+}
+const netStr=(net,len)=>len===32?ipStr(net):ipStr(net)+'/'+len;
+function validateRule(inside,outside){
+  const a=parseNet(inside), b=parseNet(outside);
+  if(a.error) return {error:'内部: '+a.error};
+  if(b.error) return {error:'外部: '+b.error};
+  if(a.len!==b.len) return {error:'内部が /'+a.len+'、外部が /'+b.len+' です。1:1 では同じ大きさの範囲にそろえてください。'};
+  return {inside:a,outside:b,adjusted:a.adjusted||b.adjusted};
+}
+function compile(rules){
+  const out=[];
+  for(const r of rules){
+    if(!r.enabled) continue;
+    const v=validateRule(r.inside,r.outside);
+    if(v.error) continue;
+    out.push({id:r.id,name:r.name,inside:{net:v.inside.net,len:v.inside.len},outside:{net:v.outside.net,len:v.outside.len}});
+  }
+  return out;
+}
+function lookup(ip,mode,comp){
+  const hits=[];
+  for(const dir of ['out','in']){
+    if(mode!=='auto'&&mode!==dir) continue;
+    let best=null;
+    for(const r of comp){
+      const from=dir==='out'?r.inside:r.outside, to=dir==='out'?r.outside:r.inside;
+      if(((ip&maskOf(from.len))>>>0)===from.net){
+        if(!best||from.len>best.from.len) best={rule:r,from,to,dir};
+      }
+    }
+    if(best){
+      best.result=((best.to.net|(ip&~maskOf(best.from.len)))>>>0);
+      best.offset=(ip-best.from.net)>>>0;
+      hits.push(best);
+    }
+  }
+  return hits;
+}
+const rangeOf=n=>({s:n.net,e:(n.net+Math.pow(2,32-n.len)-1)});
+function overlapWarnings(comp){
+  const w={};
+  const add=(id,t)=>{(w[id]=w[id]||[]).push(t)};
+  for(let i=0;i<comp.length;i++)for(let j=i+1;j<comp.length;j++){
+    for(const side of ['inside','outside']){
+      const a=comp[i][side], b=comp[j][side], ra=rangeOf(a), rb=rangeOf(b);
+      if(ra.s<=rb.e&&rb.s<=ra.e){
+        const label=side==='inside'?'内部':'外部';
+        const same=a.len===b.len;
+        const txt=same?label+'の範囲が「'+comp[j].name+'」と同一/重複 (先の定義を優先)':label+'の範囲が「'+comp[j].name+'」と包含関係 (長いプレフィックスを優先)';
+        const txt2=same?label+'の範囲が「'+comp[i].name+'」と同一/重複 (先の定義が優先され、この定義は使われません)':label+'の範囲が「'+comp[i].name+'」と包含関係 (長いプレフィックスを優先)';
+        add(comp[i].id,txt); add(comp[j].id,txt2);
+      }
+    }
+  }
+  return w;
+}
+/*END*/
+
+/* ---------- 状態 ---------- */
+const KEY='nat-calc-rules-v1';
+const DEFAULTS=[
+  {id:'r1',name:'Webサーバ',inside:'10.0.1.10',outside:'203.0.113.10',enabled:true},
+  {id:'r2',name:'DMZセグメント',inside:'192.168.10.0/24',outside:'198.51.100.0/24',enabled:true},
+  {id:'r3',name:'拠点Aの端末',inside:'172.16.0.0/28',outside:'203.0.113.64/28',enabled:true}
+];
+let rules=load(), editingId=null, mode='auto';
+function load(){
+  try{const s=localStorage.getItem(KEY); if(s){const a=JSON.parse(s); if(Array.isArray(a)) return a;}}catch(e){}
+  return DEFAULTS.map(r=>({...r}));
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(rules))}catch(e){}}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* ---------- 描画 ---------- */
+function bitsHTML(v,len,tint){
+  let h='';
+  for(let o=0;o<4;o++){
+    h+='<span class="oct">';
+    for(let k=0;k<8;k++){
+      const i=o*8+k, bit=(v>>>(31-i))&1;
+      h+='<i class="b'+(i<len?' n'+(tint?' t':''):'')+'">'+bit+'</i>';
+    }
+    h+='</span>';
+  }
+  return '<span class="bitrow">'+h+'</span>';
+}
+const dirLabel=d=>d==='out'?'内部 → 外部':'外部 → 内部';
+function hitHTML(ip,h){
+  const hostBits=32-h.from.len, count=Math.pow(2,hostBits);
+  const fromName=h.dir==='out'?'内部':'外部', toName=h.dir==='out'?'外部':'内部';
+  return '<div class="hit '+h.dir+'">'
+   +'<div class="dir">'+dirLabel(h.dir)+'</div>'
+   +'<div class="conv"><span>'+ipStr(ip)+'</span><span class="arrow" aria-hidden="true">→</span><span class="to">'+ipStr(h.result)+'</span></div>'
+   +'<div class="meta"><span>定義 <b>'+esc(h.rule.name)+'</b></span>'
+   +'<span>'+netStr(h.from.net,h.from.len)+' ↔ '+netStr(h.to.net,h.to.len)+'</span>'
+   +(h.from.len<32?'<span>範囲内の位置 <b>+'+h.offset+'</b> / '+count+'</span>':'')+'</div>'
+   +'<div class="bits"><span class="lab">'+fromName+'</span>'+bitsHTML(ip,h.from.len,false)
+   +'<span class="lab">'+toName+'</span>'+bitsHTML(h.result,h.from.len,true)+'</div>'
+   +'<div class="legend"><span><i style="background:var(--in-soft)">網掛け</i> ネットワーク部 ('+h.from.len+'bit) は置き換え</span><span>'+(hostBits?'ホスト部 ('+hostBits+'bit) はそのまま':'ホスト部なし (単一ホスト)')+'</span></div>'
+   +'</div>';
+}
+function renderCheck(){
+  const raw=$('ip').value, err=$('ip-err'), box=$('results');
+  const comp=compile(rules);
+  if(!raw.trim()){err.hidden=true; box.innerHTML='<div class="miss">IPアドレスを入力してください。</div>'; renderBatch(comp); return;}
+  const ip=parseIP(raw);
+  if(ip===null){err.hidden=false; err.textContent='IPアドレスの形式が正しくありません (例: 192.168.10.57)。'; box.innerHTML=''; renderBatch(comp); return;}
+  err.hidden=true;
+  const hits=lookup(ip,mode,comp);
+  if(!hits.length){
+    const where=mode==='out'?'どの定義の内部側にも':mode==='in'?'どの定義の外部側にも':'どの定義の内部側・外部側にも';
+    box.innerHTML='<div class="miss"><b style="color:var(--ink)">'+ipStr(ip)+'</b> は'+where+'含まれません。NATの対象外で、アドレスは変換されません。</div>';
+  } else {
+    let h=hits.map(x=>hitHTML(ip,x)).join('');
+    if(hits.length>1) h='<p class="hint">このアドレスは、ある定義の内部側と別の定義の外部側の両方に当たります。通信の向きに合う方を参照してください。</p>'+h;
+    box.innerHTML=h;
+  }
+  renderBatch(comp);
+}
+function renderBatch(comp){
+  const lines=$('batch').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  let h='<thead><tr><th>入力</th><th>方向</th><th>変換後</th><th>定義</th></tr></thead><tbody>';
+  if(!lines.length) h+='<tr><td colspan="4" class="empty">アドレスを入力してください</td></tr>';
+  for(const l of lines){
+    const ip=parseIP(l);
+    if(ip===null){h+='<tr><td class="ip">'+esc(l)+'</td><td colspan="3" style="color:var(--bad)">形式が正しくありません</td></tr>';continue;}
+    const hits=lookup(ip,mode,comp);
+    if(!hits.length){h+='<tr><td class="ip">'+ipStr(ip)+'</td><td colspan="3" style="color:var(--muted)">対象外 (変換なし)</td></tr>';continue;}
+    for(const x of hits){
+      h+='<tr><td class="ip">'+ipStr(ip)+'</td><td>'+dirLabel(x.dir)+'</td><td class="ip '+(x.dir==='out'?'outc':'inc')+'"><b>'+ipStr(x.result)+'</b></td><td>'+esc(x.rule.name)+'</td></tr>';
+    }
+  }
+  $('batch-table').innerHTML=h+'</tbody>';
+}
+function renderRules(){
+  const comp=compile(rules), warn=overlapWarnings(comp);
+  let h='<thead><tr><th>有効</th><th>名前</th><th>内部(ローカル)</th><th></th><th>外部(グローバル)</th><th style="text-align:right">アドレス数</th><th></th></tr></thead><tbody>';
+  if(!rules.length) h+='<tr><td colspan="7" class="empty">定義がありません。上のフォームから追加してください。</td></tr>';
+  for(const r of rules){
+    const v=validateRule(r.inside,r.outside);
+    let pills='';
+    if(v.error) pills+='<span class="pill bad">不正な定義</span>';
+    (warn[r.id]||[]).forEach(t=>{pills+='<span class="pill">'+esc(t)+'</span>'});
+    const cnt=v.error?'—':Math.pow(2,32-v.inside.len).toLocaleString('ja-JP');
+    h+='<tr class="'+(r.enabled?'':'off')+'"><td><input type="checkbox" data-toggle="'+r.id+'" '+(r.enabled?'checked':'')+' aria-label="'+esc(r.name)+' を有効にする"></td>'
+     +'<td>'+esc(r.name)+(pills?'<div>'+pills+'</div>':'')+'</td>'
+     +'<td class="ip inc">'+esc(r.inside)+'</td><td class="sep" aria-hidden="true">↔</td><td class="ip outc">'+esc(r.outside)+'</td>'
+     +'<td class="num">'+cnt+'</td>'
+     +'<td class="act"><button class="link" data-try="'+r.id+'">試す</button><button class="link" data-edit="'+r.id+'">編集</button><button class="link danger" data-del="'+r.id+'">削除</button></td></tr>';
+  }
+  $('rules').innerHTML=h+'</tbody>';
+}
+function renderAll(){renderRules();renderCheck();}
+
+/* ---------- 操作 ---------- */
+$('ip').addEventListener('input',renderCheck);
+$('batch').addEventListener('input',()=>renderBatch(compile(rules)));
+$('mode').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-mode]'); if(!b) return;
+  mode=b.dataset.mode;
+  document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+  renderCheck();
+});
+function resetForm(){
+  editingId=null; $('f-name').value=''; $('f-in').value=''; $('f-out').value='';
+  $('f-submit').textContent='追加'; $('f-cancel').hidden=true; $('form-err').hidden=true;
+}
+$('f-cancel').addEventListener('click',resetForm);
+$('form').addEventListener('submit',e=>{
+  e.preventDefault();
+  const err=$('form-err'); err.hidden=true;
+  const v=validateRule($('f-in').value,$('f-out').value);
+  if(v.error){err.textContent=v.error; err.hidden=false; return;}
+  const name=$('f-name').value.trim()||('定義 '+(rules.length+1));
+  const rec={name,inside:netStr(v.inside.net,v.inside.len),outside:netStr(v.outside.net,v.outside.len)};
+  if(editingId){const r=rules.find(x=>x.id===editingId); if(r) Object.assign(r,rec);}
+  else rules.push({id:uid(),enabled:true,...rec});
+  const note=v.adjusted?'ホスト部にビットが立っていたため、ネットワークアドレスに補正して保存しました。':'';
+  resetForm(); save(); renderAll();
+  if(note){err.textContent=note; err.hidden=false; err.style.color='var(--warn)'; setTimeout(()=>{err.hidden=true;err.style.color=''},6000);}
+});
+$('rules').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.del){rules=rules.filter(r=>r.id!==b.dataset.del); if(editingId===b.dataset.del) resetForm(); save(); renderAll();}
+  else if(b.dataset.edit){
+    const r=rules.find(x=>x.id===b.dataset.edit); if(!r) return;
+    editingId=r.id; $('f-name').value=r.name; $('f-in').value=r.inside; $('f-out').value=r.outside;
+    $('f-submit').textContent='更新'; $('f-cancel').hidden=false; $('f-name').focus();
+  } else if(b.dataset.try){
+    const r=rules.find(x=>x.id===b.dataset.try); if(!r) return;
+    const n=parseNet(r.inside); if(n.error) return;
+    const last=n.len<32?(n.net+Math.min(Math.pow(2,32-n.len)-1,57))>>>0:n.net;
+    $('ip').value=ipStr(last); renderCheck(); $('ip').focus(); $('ip').scrollIntoView({block:'center'});
+  }
+});
+$('rules').addEventListener('change',e=>{
+  const id=e.target.dataset&&e.target.dataset.toggle; if(!id) return;
+  const r=rules.find(x=>x.id===id); if(r){r.enabled=e.target.checked; save(); renderAll();}
+});
+function ioMsg(t,bad){const m=$('io-msg'); m.textContent=t; m.hidden=!t; m.style.color=bad?'':'var(--ok)';}
+$('io-export').addEventListener('click',()=>{
+  $('io').value=JSON.stringify(rules.map(({name,inside,outside,enabled})=>({name,inside,outside,enabled})),null,2); ioMsg('');
+});
+$('io-copy').addEventListener('click',async()=>{
+  if(!$('io').value) $('io-export').click();
+  try{await navigator.clipboard.writeText($('io').value); ioMsg('コピーしました。');}
+  catch(e){$('io').select(); ioMsg('自動コピーできませんでした。選択された内容を手動でコピーしてください。',true);}
+});
+$('io-import').addEventListener('click',()=>{
+  let a; try{a=JSON.parse($('io').value);}catch(e){ioMsg('JSONとして読み込めません。',true);return;}
+  if(!Array.isArray(a)){ioMsg('定義の配列 [ {...}, {...} ] を指定してください。',true);return;}
+  const next=[];
+  for(let i=0;i<a.length;i++){
+    const r=a[i], v=r&&validateRule(r.inside,r.outside);
+    if(!v||v.error){ioMsg((i+1)+'件目: '+(v?v.error:'定義の形式が正しくありません。'),true);return;}
+    next.push({id:uid(),name:String(r.name||'定義 '+(i+1)),inside:netStr(v.inside.net,v.inside.len),outside:netStr(v.outside.net,v.outside.len),enabled:r.enabled!==false});
+  }
+  rules=next; save(); renderAll(); ioMsg(next.length+'件の定義を読み込みました。');
+});
+
+renderAll();
+</script>
+</body>
+</html>
