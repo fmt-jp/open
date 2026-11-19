@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IPアドレス計算機</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one narrow column, input on top, summary first, then detail rows, bit map, subnet table. */
+:root{
+  --bg:#f3f6f8; --surface:#ffffff; --ink:#12202b; --muted:#566878;
+  --line:#d6dee5; --accent:#0a6c8c; --accent-soft:#e0f1f6; --bad:#b3261e; --good:#1b7a45;
+  --host:#9aa9b6;
+  --font-body:"Noto Sans JP",system-ui,-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d151c; --surface:#142029; --ink:#e5edf3; --muted:#92a4b3;
+    --line:#26343f; --accent:#4cc3e0; --accent-soft:#12303a; --bad:#ff8a80; --good:#6fd39a;
+    --host:#5b6d7c; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d151c; --surface:#142029; --ink:#e5edf3; --muted:#92a4b3;
+  --line:#26343f; --accent:#4cc3e0; --accent-soft:#12303a; --bad:#ff8a80; --good:#6fd39a;
+  --host:#5b6d7c; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);line-height:1.6;font-size:15px}
+.wrap{max-width:880px;margin:0 auto;padding:24px 16px 56px;display:flex;flex-direction:column;gap:20px}
+h1{font-size:22px;margin:0;text-wrap:balance}
+h2{font-size:15px;margin:0 0 12px;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+label{font-weight:500;font-size:13px;display:block;margin-bottom:6px}
+input[type=text],input[type=number]{
+  width:100%;font:500 17px var(--font-mono);color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{font:500 12px var(--font-mono);background:var(--accent-soft);color:var(--accent);border:0;border-radius:999px;padding:5px 11px;cursor:pointer}
+.chip:hover{filter:brightness(.95)}
+.err{color:var(--bad);font-size:13px;margin:10px 0 0;min-height:0}
+.hero{display:flex;flex-direction:column;gap:6px}
+.pill{align-self:flex-start;font:700 11px var(--font-mono);letter-spacing:.06em;background:var(--accent);color:var(--surface);border-radius:4px;padding:2px 8px}
+.net{font:700 clamp(20px,5.2vw,30px) var(--font-mono);word-break:break-all}
+.range{font:400 14px var(--font-mono);color:var(--muted);word-break:break-all}
+.stats{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:6px;font-size:13px;color:var(--muted)}
+.stats b{color:var(--ink);font-family:var(--font-mono);font-weight:500}
+dl{margin:0;display:grid;grid-template-columns:minmax(120px,190px) 1fr}
+dl>div{display:contents}
+dt,dd{margin:0;padding:9px 0;border-bottom:1px solid var(--line)}
+dl>div:last-child dt,dl>div:last-child dd{border-bottom:0}
+dt{color:var(--muted);font-size:13px;padding-right:12px}
+dd{font:400 14px var(--font-mono);display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+dd span.v{word-break:break-all;user-select:all}
+dd span.v.plain{font-family:var(--font-body);user-select:text}
+.copy{flex:none;font:500 11px var(--font-body);color:var(--accent);background:transparent;border:1px solid var(--line);border-radius:5px;padding:1px 8px;cursor:pointer}
+.copy:hover{background:var(--accent-soft)}
+@media (max-width:520px){
+  dl{grid-template-columns:1fr}
+  dt{padding-bottom:0;border-bottom:0}
+  dd{padding-top:2px}
+}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.bits{display:flex;flex-wrap:wrap;gap:6px 14px;font:500 15px var(--font-mono)}
+.grp{display:flex;gap:6px}
+.nb{letter-spacing:.02em}
+.nb.n{color:var(--accent);font-weight:700}
+.nb.h{color:var(--host)}
+.nb .b.n{color:var(--accent);font-weight:700}
+.b.h{color:var(--host)}
+.row2{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px}
+.row2>div{flex:1 1 180px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font:400 13px var(--font-mono)}
+th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+th{font:500 12px var(--font-body);color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+.note{color:var(--muted);font-size:12px;margin:8px 0 0}
+.verdict{font-weight:700;margin:10px 0 0;font-size:14px}
+.verdict.ok{color:var(--good)}
+.verdict.ng{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:13px;padding:6px 14px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .15s}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>IPアドレス計算機</h1>
+    <p class="sub">IPv4 と IPv6 のサブネット計算、分割、包含チェック。入力すると自動で計算します。</p>
+  </header>
+
+  <section class="card" aria-label="入力">
+    <label for="ip">アドレス / プレフィックス</label>
+    <input id="ip" type="text" value="192.168.10.37/24" autocomplete="off" spellcheck="false" inputmode="url">
+    <p class="hint">CIDR表記 (192.168.1.10/24)、サブネットマスク指定 (192.168.1.10 255.255.255.0)、プレフィックス省略 (単一アドレス) に対応。IPv6 は :: の省略形と IPv4 埋め込み形式も使えます。</p>
+    <div class="chips" id="chips"></div>
+    <p class="err" id="err" role="alert" hidden></p>
+  </section>
+
+  <div id="result" style="display:flex;flex-direction:column;gap:20px">
+    <section class="card hero" aria-label="概要">
+      <span class="pill" id="ver">IPv4</span>
+      <div class="net" id="heroNet"></div>
+      <div class="range" id="heroRange"></div>
+      <div class="stats" id="heroStats"></div>
+    </section>
+
+    <section class="card" aria-label="詳細">
+      <h2>詳細</h2>
+      <dl id="rows"></dl>
+    </section>
+
+    <section class="card" aria-label="ビット表示">
+      <h2>ビット表示</h2>
+      <div class="legend"><span><i style="background:var(--accent)"></i>ネットワーク部</span><span><i style="background:var(--host)"></i>ホスト部</span></div>
+      <div id="bitsAddr"></div>
+      <p class="note" id="bitsNote"></p>
+    </section>
+
+    <section class="card" aria-label="サブネット分割">
+      <h2>サブネット分割</h2>
+      <div class="row2">
+        <div>
+          <label for="splitP">分割後のプレフィックス長</label>
+          <input id="splitP" type="number" min="0" max="32" step="1" value="26">
+        </div>
+      </div>
+      <p class="err" id="splitErr" hidden></p>
+      <div id="splitOut"></div>
+    </section>
+
+    <section class="card" aria-label="包含チェック">
+      <h2>包含チェック</h2>
+      <label for="chk">このネットワークに含まれるか確認するアドレス</label>
+      <input id="chk" type="text" placeholder="192.168.10.200" autocomplete="off" spellcheck="false">
+      <p class="verdict" id="verdict" aria-live="polite"></p>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const HEX16 = 0xffffn;
+
+/* ---------- パース ---------- */
+function parseV4(s){
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+  if(!m) return null;
+  let v = 0n;
+  for(let i = 1; i <= 4; i++){
+    const n = Number(m[i]);
+    if(n > 255) return null;
+    v = (v << 8n) | BigInt(n);
+  }
+  return v;
+}
+function parseV6(s){
+  s = s.replace(/%.*$/, "");
+  if(!/^[0-9a-fA-F:.]+$/.test(s)) return null;
+  if(s.includes(".")){
+    const i = s.lastIndexOf(":");
+    if(i < 0) return null;
+    const v4 = parseV4(s.slice(i + 1));
+    if(v4 === null) return null;
+    s = s.slice(0, i + 1) + (v4 >> 16n).toString(16) + ":" + (v4 & HEX16).toString(16);
+  }
+  let groups;
+  if(s.includes("::")){
+    const p = s.split("::");
+    if(p.length !== 2) return null;
+    const h = p[0] ? p[0].split(":") : [];
+    const t = p[1] ? p[1].split(":") : [];
+    if(h.length + t.length > 7) return null;
+    groups = [...h, ...Array(8 - h.length - t.length).fill("0"), ...t];
+  } else {
+    groups = s.split(":");
+    if(groups.length !== 8) return null;
+  }
+  let v = 0n;
+  for(const g of groups){
+    if(!/^[0-9a-fA-F]{1,4}$/.test(g)) return null;
+    v = (v << 16n) | BigInt(parseInt(g, 16));
+  }
+  return v;
+}
+function parseInput(raw){
+  const s = raw.trim();
+  if(!s) return {error: "アドレスを入力してください。"};
+  let a = s, p = null;
+  const si = s.indexOf("/");
+  if(si >= 0){ a = s.slice(0, si).trim(); p = s.slice(si + 1).trim(); }
+  else {
+    const t = s.split(/\s+/);
+    if(t.length === 2){ a = t[0]; p = t[1]; }
+    else if(t.length > 2) return {error: "入力形式が正しくありません。例: 192.168.1.10/24"};
+  }
+  const ver = a.includes(":") ? 6 : 4;
+  const addr = ver === 6 ? parseV6(a) : parseV4(a);
+  if(addr === null) return {error: ver === 6 ? "IPv6アドレスの形式が正しくありません。" : "IPv4アドレスの形式が正しくありません。各オクテットは 0〜255 です。"};
+  const bits = ver === 4 ? 32 : 128;
+  let prefix = bits;
+  if(p !== null){
+    if(/^\d+$/.test(p)){
+      prefix = Number(p);
+      if(prefix > bits) return {error: `プレフィックス長は 0〜${bits} の範囲で指定してください。`};
+    } else if(ver === 4 && parseV4(p) !== null){
+      const m = parseV4(p);
+      const inv = (~m) & 0xffffffffn;
+      if((inv & (inv + 1n)) !== 0n) return {error: "サブネットマスクの1が連続していません。"};
+      prefix = 32 - (inv === 0n ? 0 : inv.toString(2).length);
+    } else {
+      return {error: "プレフィックス長またはサブネットマスクの形式が正しくありません。"};
+    }
+  }
+  return {ver, bits, addr, prefix};
+}
+
+/* ---------- 整形 ---------- */
+const fmtV4 = v => [24, 16, 8, 0].map(sh => Number((v >> BigInt(sh)) & 255n)).join(".");
+const groups6 = v => Array.from({length: 8}, (_, i) => Number((v >> BigInt(112 - 16 * i)) & HEX16));
+const expand6 = v => groups6(v).map(g => g.toString(16).padStart(4, "0")).join(":");
+function compress6(v){
+  const g = groups6(v).map(x => x.toString(16));
+  let bs = -1, bl = 0;
+  for(let i = 0; i < 8;){
+    if(g[i] === "0"){
+      let j = i;
+      while(j < 8 && g[j] === "0") j++;
+      if(j - i > bl){ bs = i; bl = j - i; }
+      i = j;
+    } else i++;
+  }
+  if(bl < 2) return g.join(":");
+  return g.slice(0, bs).join(":") + "::" + g.slice(bs + bl).join(":");
+}
+const fmt = (v, ver) => ver === 4 ? fmtV4(v) : compress6(v);
+const commas = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- 種別判定 ---------- */
+const V4_TYPES = [
+  ["255.255.255.255", 32, "限定ブロードキャスト"],
+  ["0.0.0.0", 8, "このネットワーク (0.0.0.0/8)"],
+  ["10.0.0.0", 8, "プライベート (RFC 1918)"],
+  ["100.64.0.0", 10, "共有アドレス空間 / CGNAT (RFC 6598)"],
+  ["127.0.0.0", 8, "ループバック"],
+  ["169.254.0.0", 16, "リンクローカル (APIPA)"],
+  ["172.16.0.0", 12, "プライベート (RFC 1918)"],
+  ["192.0.0.0", 24, "IETFプロトコル割り当て"],
+  ["192.0.2.0", 24, "ドキュメント用 (TEST-NET-1)"],
+  ["192.168.0.0", 16, "プライベート (RFC 1918)"],
+  ["198.18.0.0", 15, "ベンチマーク用"],
+  ["198.51.100.0", 24, "ドキュメント用 (TEST-NET-2)"],
+  ["203.0.113.0", 24, "ドキュメント用 (TEST-NET-3)"],
+  ["224.0.0.0", 4, "マルチキャスト"],
+  ["240.0.0.0", 4, "予約済み (将来用)"]
+];
+const V6_TYPES = [
+  ["::", 128, "未指定アドレス"],
+  ["::1", 128, "ループバック"],
+  ["::ffff:0:0", 96, "IPv4射影アドレス (IPv4-mapped)"],
+  ["64:ff9b::", 96, "NAT64 変換用"],
+  ["2001:db8::", 32, "ドキュメント用"],
+  ["2001::", 32, "Teredo"],
+  ["2002::", 16, "6to4"],
+  ["fe80::", 10, "リンクローカル"],
+  ["fc00::", 7, "ユニークローカル (ULA)"],
+  ["ff00::", 8, "マルチキャスト"],
+  ["2000::", 3, "グローバルユニキャスト"]
+];
+function classify(addr, ver){
+  const bits = ver === 4 ? 32 : 128;
+  const list = ver === 4 ? V4_TYPES : V6_TYPES;
+  for(const [base, len, name] of list){
+    const b = ver === 4 ? parseV4(base) : parseV6(base);
+    const sh = BigInt(bits - len);
+    if((addr >> sh) === (b >> sh)) return name;
+  }
+  return ver === 4 ? "グローバル (パブリック)" : "予約済み / 未割り当て";
+}
+function v4Class(addr){
+  const o = Number(addr >> 24n);
+  if(o < 128) return "クラスA";
+  if(o < 192) return "クラスB";
+  if(o < 224) return "クラスC";
+  if(o < 240) return "クラスD (マルチキャスト)";
+  return "クラスE (予約)";
+}
+
+/* ---------- 計算 ---------- */
+function calc(r){
+  const {ver, bits, addr, prefix} = r;
+  const hb = BigInt(bits - prefix);
+  const full = (1n << BigInt(bits)) - 1n;
+  const hostMask = (1n << hb) - 1n;
+  const mask = full ^ hostMask;
+  const net = addr & mask;
+  const last = net | hostMask;
+  const total = 1n << hb;
+  return {...r, hb: bits - prefix, mask, net, last, total, hostMask};
+}
+
+/* ---------- 描画 ---------- */
+let cur = null;
+let lastKey = "";
+
+function bitMap(addr, prefix, bits, grp){
+  let out = "";
+  for(let g = 0; g < bits; g += grp){
+    out += '<div class="grp">';
+    for(let n = g; n < g + grp; n += 4){
+      let cls = "", chars = "";
+      let html = '<span class="nb">';
+      for(let i = n; i < n + 4; i++){
+        const bit = (addr >> BigInt(bits - 1 - i)) & 1n;
+        html += `<span class="b ${i < prefix ? "n" : "h"}">${bit}</span>`;
+      }
+      html += "</span>";
+      out += html;
+    }
+    out += "</div>";
+  }
+  return out;
+}
+
+function rowsHtml(list){
+  return list.map(([k, v, plain]) =>
+    `<div><dt>${esc(k)}</dt><dd><span class="v${plain ? " plain" : ""}">${esc(v)}</span>${plain ? "" : `<button class="copy" type="button" data-copy="${esc(v)}">コピー</button>`}</dd></div>`
+  ).join("");
+}
+
+function render(c){
+  const {ver, bits, addr, prefix, mask, net, last, total, hb} = c;
+  $("ver").textContent = "IPv" + ver;
+  $("heroNet").textContent = fmt(net, ver) + "/" + prefix;
+  const rows = [];
+  let usable, first, lastHost, usableTxt;
+  if(ver === 4){
+    if(prefix === 32){ first = net; lastHost = net; usable = 1n; usableTxt = "1 (単一ホスト)"; }
+    else if(prefix === 31){ first = net; lastHost = last; usable = 2n; usableTxt = "2 (ポイントツーポイント, RFC 3021)"; }
+    else { first = net + 1n; lastHost = last - 1n; usable = total - 2n; usableTxt = commas(usable); }
+    $("heroRange").textContent = fmtV4(first) + " – " + fmtV4(lastHost);
+    $("heroStats").innerHTML = `<span>利用可能ホスト <b>${commas(usable)}</b></span><span>マスク <b>${fmtV4(mask)}</b></span><span>${esc(classify(addr, 4))}</span>`;
+    const rev = fmtV4(addr).split(".").reverse().join(".") + ".in-addr.arpa";
+    rows.push(
+      ["IPアドレス", fmtV4(addr)],
+      ["ネットワークアドレス", fmtV4(net) + "/" + prefix],
+      ["サブネットマスク", fmtV4(mask)],
+      ["ワイルドカードマスク", fmtV4(c.hostMask)],
+      ["ブロードキャスト", fmtV4(last)],
+      ["最初のホスト", fmtV4(first)],
+      ["最後のホスト", fmtV4(lastHost)],
+      ["利用可能ホスト数", usableTxt, true],
+      ["総アドレス数", commas(total) + (hb >= 10 ? ` (2^${hb})` : ""), true],
+      ["クラス", v4Class(addr), true],
+      ["種別", classify(addr, 4), true],
+      ["整数値", addr.toString()],
+      ["16進数", "0x" + addr.toString(16).padStart(8, "0").toUpperCase()],
+      ["逆引き (PTR)", rev]
+    );
+  } else {
+    first = net; lastHost = last;
+    $("heroRange").textContent = compress6(net) + " – " + compress6(last);
+    const subs64 = prefix <= 64 ? (1n << BigInt(64 - prefix)) : null;
+    $("heroStats").innerHTML = `<span>総アドレス数 <b>2^${hb}</b></span>${subs64 ? `<span>/64 サブネット <b>${commas(subs64)}</b></span>` : ""}<span>${esc(classify(addr, 6))}</span>`;
+    const nib = expand6(addr).replace(/:/g, "").split("").reverse().join(".") + ".ip6.arpa";
+    rows.push(
+      ["IPアドレス (短縮形)", compress6(addr)],
+      ["IPアドレス (完全形)", expand6(addr)],
+      ["ネットワークアドレス", compress6(net) + "/" + prefix],
+      ["ネットワーク (完全形)", expand6(net)],
+      ["プレフィックス長", "/" + prefix, true],
+      ["最初のアドレス", compress6(net)],
+      ["最後のアドレス", compress6(last)],
+      ["総アドレス数", commas(total) + ` (2^${hb})`, true]
+    );
+    if(subs64) rows.push(["/64 サブネット数", commas(subs64) + ` (2^${64 - prefix})`, true]);
+    rows.push(
+      ["種別", classify(addr, 6), true],
+      ["整数値", addr.toString()],
+      ["16進数", "0x" + addr.toString(16).padStart(32, "0").toUpperCase()],
+      ["逆引き (ip6.arpa)", nib]
+    );
+  }
+  $("rows").innerHTML = rowsHtml(rows);
+  $("bitsAddr").innerHTML = `<div class="bits">${bitMap(addr, prefix, bits, ver === 4 ? 8 : 16)}</div>`;
+  $("bitsNote").textContent = `${bits}ビット中、先頭 ${prefix} ビットがネットワーク部、残り ${hb} ビットがホスト部です。`;
+
+  const sp = $("splitP");
+  sp.min = prefix; sp.max = bits;
+  const key = ver + ":" + prefix;
+  if(key !== lastKey){
+    lastKey = key;
+    sp.value = ver === 4 ? Math.min(prefix + 2, 32) : (prefix < 64 ? 64 : Math.min(prefix + 4, 128));
+  }
+  renderSplit();
+  renderCheck();
+}
+
+function renderSplit(){
+  const out = $("splitOut"), err = $("splitErr");
+  err.hidden = true; out.innerHTML = "";
+  if(!cur) return;
+  const {ver, bits, prefix, net} = cur;
+  const raw = $("splitP").value;
+  const np = Number(raw);
+  if(raw === "" || !Number.isInteger(np) || np < prefix || np > bits){
+    err.textContent = `${prefix} 〜 ${bits} の整数を入力してください。`;
+    err.hidden = false;
+    return;
+  }
+  const count = 1n << BigInt(np - prefix);
+  const sizeBits = BigInt(bits - np);
+  const LIMIT = 128n;
+  const shown = Number(count < LIMIT ? count : LIMIT);
+  let body = "";
+  for(let i = 0; i < shown; i++){
+    const n = net + (BigInt(i) << sizeBits);
+    const l = n | ((1n << sizeBits) - 1n);
+    let a = n, b = l;
+    if(ver === 4 && np <= 30){ a = n + 1n; b = l - 1n; }
+    body += `<tr><td>${i + 1}</td><td>${fmt(n, ver)}/${np}</td><td>${fmt(a, ver)} – ${fmt(b, ver)}</td>${ver === 4 ? `<td>${fmtV4(l)}</td>` : ""}</tr>`;
+  }
+  const head = `<tr><th>#</th><th>ネットワーク</th><th>${ver === 4 ? "ホスト範囲" : "アドレス範囲"}</th>${ver === 4 ? "<th>ブロードキャスト</th>" : ""}</tr>`;
+  out.innerHTML = `<p class="note" style="margin:0 0 10px">${commas(count)} 個のサブネットに分割 (各 ${commas(1n << sizeBits)} アドレス)</p><div class="tablewrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>` +
+    (count > LIMIT ? `<p class="note">先頭 ${LIMIT} 件のみ表示しています。</p>` : "");
+}
+
+function renderCheck(){
+  const v = $("verdict");
+  v.className = "verdict"; v.textContent = "";
+  const raw = $("chk").value.trim();
+  if(!raw || !cur) return;
+  const ver = raw.includes(":") ? 6 : 4;
+  const a = ver === 6 ? parseV6(raw) : parseV4(raw);
+  if(a === null){ v.textContent = "アドレスの形式が正しくありません。"; v.classList.add("ng"); return; }
+  if(ver !== cur.ver){ v.textContent = `IPv${ver} のアドレスは IPv${cur.ver} ネットワークには含まれません。`; v.classList.add("ng"); return; }
+  const inside = (a & cur.mask) === cur.net;
+  v.textContent = inside ? `含まれます: ${fmt(a, ver)} は ${fmt(cur.net, ver)}/${cur.prefix} の範囲内です。` : `含まれません: ${fmt(a, ver)} は ${fmt(cur.net, ver)}/${cur.prefix} の範囲外です。`;
+  v.classList.add(inside ? "ok" : "ng");
+}
+
+function update(){
+  const r = parseInput($("ip").value);
+  const err = $("err");
+  if(r.error){
+    err.textContent = r.error; err.hidden = false;
+    $("result").hidden = true;
+    cur = null;
+    return;
+  }
+  err.hidden = true; $("result").hidden = false;
+  cur = calc(r);
+  render(cur);
+}
+
+/* ---------- イベント ---------- */
+const EXAMPLES = ["192.168.10.37/24", "10.0.0.0/8", "172.16.5.4 255.255.240.0", "203.0.113.9/30", "2001:db8:1234::1/48", "fe80::1/64", "::ffff:192.0.2.1/96"];
+$("chips").innerHTML = EXAMPLES.map(e => `<button type="button" class="chip" data-ex="${esc(e)}">${esc(e)}</button>`).join("");
+$("chips").addEventListener("click", e => {
+  const b = e.target.closest("[data-ex]");
+  if(!b) return;
+  $("ip").value = b.dataset.ex;
+  update();
+});
+$("ip").addEventListener("input", update);
+$("splitP").addEventListener("input", renderSplit);
+$("chk").addEventListener("input", renderCheck);
+
+let toastTimer;
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1400);
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-copy]");
+  if(!b) return;
+  try {
+    await navigator.clipboard.writeText(b.dataset.copy);
+    toast("コピーしました");
+  } catch(_) {
+    toast("コピーできませんでした。値を選択してコピーしてください");
+  }
+});
+
+update();
+</script>
+</body>
+</html>
