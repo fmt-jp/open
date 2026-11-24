@@ -100,9 +100,12 @@
       <div class="data-actions">
         <button type="button" class="btn-ghost" id="btn-save">データを保存…</button>
         <button type="button" class="btn-ghost" id="btn-load">データを読み込む…</button>
+        <button type="button" class="btn-ghost" id="btn-export">エクスポート</button>
+        <button type="button" class="btn-ghost" id="btn-import">インポート</button>
         <button type="button" class="btn-ghost btn-ghost-danger" id="btn-reset">初期状態に戻す</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
       </div>
-      <p class="hint" style="margin-top:-8px; margin-bottom:14px;">保存データは5つまで保存でき、保存先（枠）を選んで上書き・読み込みができます。</p>
+      <p class="hint" style="margin-top:-8px; margin-bottom:14px;">保存データは5つまで保存でき、保存先（枠）を選んで上書き・読み込みができます（メモも付けられます）。エクスポート／インポートで、入力内容をファイル（JSON）として書き出し・読み込みできます。</p>
 
       <div id="global-errors" class="global-errors" hidden aria-live="polite"></div>
       <button type="button" class="btn-primary btn-calc" id="btn-calculate">この内容で試算する</button>
@@ -156,6 +159,10 @@
     <h3 id="slot-modal-title">保存先を選択</h3>
     <p class="modal-note" id="slot-modal-note"></p>
     <div id="slot-list" class="slot-list"></div>
+    <label class="field slot-memo-field" id="slot-memo-wrap">
+      <span class="field-label">メモ（任意・40文字まで）</span>
+      <input type="text" id="slot-memo" class="memo-input" maxlength="40" placeholder="例：60歳で完全退職した場合">
+    </label>
     <div class="modal-actions">
       <button type="button" class="btn-ghost" id="slot-modal-cancel">キャンセル</button>
       <button type="button" class="btn-primary" id="slot-modal-confirm" disabled>決定</button>

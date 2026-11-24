@@ -92,7 +92,13 @@
     slotModalNote: document.getElementById("slot-modal-note"),
     slotList: document.getElementById("slot-list"),
     slotModalCancel: document.getElementById("slot-modal-cancel"),
-    slotModalConfirm: document.getElementById("slot-modal-confirm")
+    slotModalConfirm: document.getElementById("slot-modal-confirm"),
+    slotMemoWrap: document.getElementById("slot-memo-wrap"),
+    slotMemo: document.getElementById("slot-memo"),
+
+    btnExport: document.getElementById("btn-export"),
+    btnImport: document.getElementById("btn-import"),
+    importFile: document.getElementById("import-file")
   };
 
   /* ---------------------------------------------------------------------
@@ -668,6 +674,8 @@
     el.slotModalNote.textContent = mode === "save"
       ? "保存する枠を選んでください。既にデータがある枠を選ぶと上書きされます。"
       : "読み込む枠を選んでください。現在の入力内容は読み込んだ内容で置き換わります。";
+    el.slotMemo.value = "";
+    el.slotMemoWrap.hidden = mode !== "save";
     renderSlotList();
     el.slotModalConfirm.disabled = true;
     el.slotModal.hidden = false;
@@ -695,11 +703,13 @@
 
       const title = isEmpty ? "空き" : `保存日時：${formatSavedAt(slotData.savedAt)}`;
       const meta = isEmpty ? "まだデータがありません" : (slotSummary(slotData) || "");
+      const memo = (!isEmpty && slotData.memo) ? slotData.memo : "";
 
       btn.innerHTML = `
         <span class="slot-badge">${n}</span>
         <span class="slot-info">
           <span class="slot-title">スロット${n}　${escapeHtml(title)}</span>
+          ${memo ? `<span class="slot-memo">${escapeHtml(memo)}</span>` : ""}
           <span class="slot-meta">${escapeHtml(meta)}</span>
         </span>
         <span class="slot-check" aria-hidden="true"></span>
@@ -711,6 +721,9 @@
         Array.from(el.slotList.children).forEach(c => c.classList.remove("is-selected"));
         btn.classList.add("is-selected");
         el.slotModalConfirm.disabled = false;
+        if (slotModalMode === "save" && slotData && slotData.memo){
+          el.slotMemo.value = slotData.memo;
+        }
       });
 
       el.slotList.appendChild(btn);
@@ -728,7 +741,7 @@
         if (!ok) return;
       }
       try {
-        setSlot(n, { savedAt: new Date().toISOString(), state: state });
+        setSlot(n, { savedAt: new Date().toISOString(), memo: el.slotMemo.value.trim().slice(0, 40), state: state });
         flashStatus(`スロット${n}に保存しました。`);
         closeSlotModal();
       } catch (e){
@@ -744,6 +757,7 @@
       if (!ok) return;
       try {
         state = slotData.state;
+        lastResult = null;
         fillBasicFields();
         renderItemList("income");
         renderItemList("expense");
@@ -756,8 +770,103 @@
     }
   }
 
+  /* ---------------------------------------------------------------------
+     エクスポート／インポート（JSONファイル）
+     --------------------------------------------------------------------- */
+  function exportToFile(){
+    try {
+      const payload = {
+        app: "rougo-sim",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        state: state
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const d = new Date();
+      const pad = (v) => String(v).padStart(2, "0");
+      const name = `rougo-sim_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      flashStatus("エクスポートしました。");
+    } catch (e){
+      flashStatus("エクスポートできませんでした。");
+    }
+  }
+
+  function num(v, fallback){
+    return (typeof v === "number" && Number.isFinite(v)) ? v : fallback;
+  }
+  function sanitizeItems(arr){
+    if (!Array.isArray(arr)) return null;
+    const periods = ["month", "year", "everyN", "once"];
+    return arr.map(it => ({
+      id: uid(),
+      name: typeof it.name === "string" ? it.name : "",
+      amount: num(it.amount, 0),
+      period: periods.includes(it.period) ? it.period : "year",
+      n: num(it.n, 5),
+      startAge: num(it.startAge, 60),
+      endAge: num(it.endAge, 90)
+    }));
+  }
+  // 読み込んだデータが想定の形かを確認し、安全な state に整形する（不正なら null）
+  function sanitizeState(raw){
+    if (!raw || typeof raw !== "object") return null;
+    const src = (raw.state && typeof raw.state === "object") ? raw.state : raw;
+    if (!src.basic || !src.economic) return null;
+    const incomes = sanitizeItems(src.incomes);
+    const expenses = sanitizeItems(src.expenses);
+    if (!incomes || !expenses) return null;
+    const def = defaultState();
+    return {
+      basic: {
+        currentAge: num(src.basic.currentAge, def.basic.currentAge),
+        retireAge: num(src.basic.retireAge, def.basic.retireAge),
+        endAge: num(src.basic.endAge, def.basic.endAge),
+        currentAssets: num(src.basic.currentAssets, def.basic.currentAssets),
+        lumpSum: num(src.basic.lumpSum, def.basic.lumpSum)
+      },
+      economic: {
+        inflation: num(src.economic.inflation, def.economic.inflation),
+        returnRate: num(src.economic.returnRate, def.economic.returnRate)
+      },
+      incomes,
+      expenses
+    };
+  }
+
+  function importFromFile(file){
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed = null;
+      try { parsed = JSON.parse(String(reader.result)); } catch (e){ parsed = null; }
+      const next = sanitizeState(parsed);
+      if (!next){
+        flashStatus("このファイルは読み込めませんでした。エクスポートしたファイルを選んでください。");
+        return;
+      }
+      if (!window.confirm("ファイルの内容を読み込みます。現在の入力内容は置き換わります。よろしいですか？")) return;
+      state = next;
+      lastResult = null;
+      fillBasicFields();
+      renderItemList("income");
+      renderItemList("expense");
+      flashStatus("インポートしました。");
+    };
+    reader.onerror = () => flashStatus("ファイルを読み込めませんでした。");
+    reader.readAsText(file);
+  }
+
   function resetToDefault(){
     state = defaultState();
+    lastResult = null;
     fillBasicFields();
     renderItemList("income");
     renderItemList("expense");
@@ -810,6 +919,12 @@
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !el.slotModal.hidden) closeSlotModal();
+    });
+    el.btnExport.addEventListener("click", exportToFile);
+    el.btnImport.addEventListener("click", () => { el.importFile.click(); });
+    el.importFile.addEventListener("change", () => {
+      importFromFile(el.importFile.files[0]);
+      el.importFile.value = "";
     });
     el.btnReset.addEventListener("click", () => {
       if (window.confirm("入力内容を初期状態に戻します。よろしいですか？")){
