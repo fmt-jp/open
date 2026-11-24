@@ -101,9 +101,9 @@
         <button type="button" class="btn-ghost" id="btn-save">データを保存…</button>
         <button type="button" class="btn-ghost" id="btn-load">データを読み込む…</button>
         <button type="button" class="btn-ghost" id="btn-export">エクスポート</button>
-        <button type="button" class="btn-ghost" id="btn-import">インポート</button>
+        <label class="btn-ghost btn-file" id="btn-import" for="import-file" tabindex="0" role="button">インポート</label>
         <button type="button" class="btn-ghost btn-ghost-danger" id="btn-reset">初期状態に戻す</button>
-        <input type="file" id="import-file" accept=".json,application/json" hidden>
+        <input type="file" id="import-file" class="visually-hidden" accept=".json,application/json,text/plain">
       </div>
       <p class="hint" style="margin-top:-8px; margin-bottom:14px;">保存データは5つまで保存でき、保存先（枠）を選んで上書き・読み込みができます（メモも付けられます）。エクスポート／インポートで、入力内容をファイル（JSON）として書き出し・読み込みできます。</p>
 

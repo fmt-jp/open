@@ -921,7 +921,9 @@
       if (e.key === "Escape" && !el.slotModal.hidden) closeSlotModal();
     });
     el.btnExport.addEventListener("click", exportToFile);
-    el.btnImport.addEventListener("click", () => { el.importFile.click(); });
+    el.btnImport.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); el.importFile.click(); }
+    });
     el.importFile.addEventListener("change", () => {
       importFromFile(el.importFile.files[0]);
       el.importFile.value = "";
